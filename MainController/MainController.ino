@@ -36,7 +36,7 @@
 #define BLUE 9
 
 // (Create an instance of a radio, specifying the CE and CS pins. )
-RF24 myRadio(7, 8); // "myRadio" is the identifier you will use in following methods
+RF24 myRadio(9, 10); // "myRadio" is the identifier you will use in following methods
 /*-----( Declare Variables )-----*/
 byte addresses[][6] = { "1Node"}; // Create address for 1 pipe.
 float watchdog;
@@ -101,7 +101,7 @@ void setup()   /****** SETUP: RUNS ONCE ******/
 
   //For the LM35 Temperature sensor, (used on the pipe),use more of the ADC range
   //This sensor is used as it seems simpler to stick it to the water pipe
-  analogReference(INTERNAL);          
+  //analogReference(INTERNAL);          
 	
 	Serial.begin(115200);
 	clock.begin();
