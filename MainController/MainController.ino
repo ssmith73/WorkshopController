@@ -86,31 +86,31 @@ float ambientTemperature = 0;
 float pipeTemperature = 0;
 float pipeTempC;
 int   readTempC;
-void setup()   /****** SETUP: RUNS ONCE ******/
+void setup() /****** SETUP: RUNS ONCE ******/
 {
 	pinMode(AMB_RELAY_EN, OUTPUT);
 	pinMode(PUMP_RELAY_EN, OUTPUT);
-  pinMode(FAN_RELAY_EN, OUTPUT);
-  pinMode(RED,OUTPUT);
-  pinMode(GREEN,OUTPUT);
-  pinMode(BLUE,OUTPUT);
-  
-  digitalWrite(PUMP_RELAY_EN, HIGH);
-  digitalWrite(FAN_RELAY_EN, HIGH);
-  digitalWrite(AMB_RELAY_EN, HIGH);
+	pinMode(FAN_RELAY_EN, OUTPUT);
+	pinMode(RED, OUTPUT);
+	pinMode(GREEN, OUTPUT);
+	pinMode(BLUE, OUTPUT);
 
-  //For the LM35 Temperature sensor, (used on the pipe),use more of the ADC range
-  //This sensor is used as it seems simpler to stick it to the water pipe
-  //analogReference(INTERNAL);          
-	
+	digitalWrite(PUMP_RELAY_EN, HIGH);
+	digitalWrite(FAN_RELAY_EN, HIGH);
+	digitalWrite(AMB_RELAY_EN, HIGH);
+
+	//For the LM35 Temperature sensor, (used on the pipe),use more of the ADC range
+	//This sensor is used as it seems simpler to stick it to the water pipe
+	//analogReference(INTERNAL);
+
 	Serial.begin(115200);
 	clock.begin();
 	delay(1000);
 	Serial.println(F("RF24/Simple Receive data Test"));
 	Serial.println(F("Questions: terry@yourduino.com"));
 
-	myRadio.begin();  // Start up the physical nRF24L01 Radio
-	myRadio.setChannel(108);  // Above most Wifi Channels
+	myRadio.begin();		 // Start up the physical nRF24L01 Radio
+	myRadio.setChannel(108); // Above most Wifi Channels
 	// Set the PA Level low to prevent power supply related issues since this is a
 	myRadio.setPALevel(RF24_PA_MIN);
 	//myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
@@ -133,22 +133,18 @@ void setup()   /****** SETUP: RUNS ONCE ******/
 	/* Clear MCU Status Register. Not really needed here as we don't need to know why the MCU got reset. page 44 of datasheet */
 	MCUSR = 0;
 
-
 	wdt_reset();
 
 	WDTCSR |= B00011000;
-	WDTCSR =  B01101001;
+	WDTCSR = B01101001;
 
 	// Enable all interrupts.
 	sei();
 	Serial.println(F("Setup Complete: "));
 
-  upTimeClk = clock.getDateTime();
-      
-  
+	upTimeClk = clock.getDateTime();
 
-}//--(end setup )---j
-
+} //--(end setup )---j
 
 void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 {

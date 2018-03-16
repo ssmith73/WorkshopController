@@ -39,10 +39,15 @@ byte addresses[][6] = { "1Node" }; // Create address for 1 pipe.
 float tempC;
 int reading;
 int tempPin = 0;
+unsigned long startTime = 0;
+bool boilerOn;
 
 struct payload_t {
-	int channelNumber;
-	float tempC;
+  int channelNumber;
+  float tempC;
+  float ambTempTh;
+  float pipeTempTh;
+  bool boilerOn;
 };
 
 void setup()   /****** SETUP: RUNS ONCE ******/
@@ -70,18 +75,42 @@ void setup()   /****** SETUP: RUNS ONCE ******/
 
 void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 {
+	unsigned long loopTime = millis() - startTime; //Calculate the time since last time the cycle was completed
+
+	if (loopTime <= 1000) //Check if the time is less than 1000 millis, and if so, run loop 1
+	{
+		boilerOn = true;
+		Serial.println("Loop 1");
+	}
+	else if (loopTime > 1000 && loopTime <= 2000) //If time is over 1000 millis and less than/or 2000 millis, run loop 2
+	{
+		boilerOn = false;
+		Serial.println("Loop 2");
+	}
+	else if (loopTime > 2000) //If time is over 2000 millis, set the startTime to millis so the loop time will be reset to zero
+	{
+		boilerOn = true;
+		startTime = millis();
+	}
+	else if(loopTime > 5000) {
+		startTime = 0;
+		boilerOn = false;
+	}
+
 	//TempSense
 	reading = analogRead(tempPin);
 	tempC = reading / 9.31;
 	Serial.println(tempC);
-	payload_t payload = { 0,tempC };
+	payload_t payload = {0, tempC,7,21,boilerOn};
 	//myRadio.write(&tempC, sizeof(tempC)); //  Transmit the data
 	myRadio.write(&payload, sizeof(payload)); //  Transmit the data
 
 	//Wireless Tx
-	Serial.print(F("Data Transmitted = pipe: ")); Serial.print(payload.channelNumber);
-	Serial.print(F(" Temp: "));Serial.println(payload.tempC);
+	Serial.print(F("Data Transmitted = pipe: "));
+	Serial.print(payload.channelNumber);
+	Serial.print(F(" Temp: "));
+	Serial.println(payload.tempC);
 	Serial.println(F(" No Acknowledge expected"));
-	delay(1000);
+	delay(200);
 
-}//--(end main loop )---
+} //--(end main loop )---

@@ -41,61 +41,6 @@
 #define ADJ_BASELINE 11
 #endif
 
-/*
-available fonts
-| | | | | |-FreeMono12pt7b.h
-| | | | | |-FreeMono18pt7b.h
-| | | | | |-FreeMono24pt7b.h
-| | | | | |-FreeMono9pt7b.h
-| | | | | |-FreeMonoBold12pt7b.h
-| | | | | |-FreeMonoBold18pt7b.h
-| | | | | |-FreeMonoBold24pt7b.h
-| | | | | |-FreeMonoBold9pt7b.h
-| | | | | |-FreeMonoBoldOblique12pt7b.h
-| | | | | |-FreeMonoBoldOblique18pt7b.h
-| | | | | |-FreeMonoBoldOblique24pt7b.h
-| | | | | |-FreeMonoBoldOblique9pt7b.h
-| | | | | |-FreeMonoOblique12pt7b.h
-| | | | | |-FreeMonoOblique18pt7b.h
-| | | | | |-FreeMonoOblique24pt7b.h
-| | | | | |-FreeMonoOblique9pt7b.h
-| | | | | |-FreeSans12pt7b.h
-| | | | | |-FreeSans18pt7b.h
-| | | | | |-FreeSans24pt7b.h
-| | | | | |-FreeSans9pt7b.h
-| | | | | |-FreeSansBold12pt7b.h
-| | | | | |-FreeSansBold18pt7b.h
-| | | | | |-FreeSansBold24pt7b.h
-| | | | | |-FreeSansBold9pt7b.h
-| | | | | |-FreeSansBoldOblique12pt7b.h
-| | | | | |-FreeSansBoldOblique18pt7b.h
-| | | | | |-FreeSansBoldOblique24pt7b.h
-| | | | | |-FreeSansBoldOblique9pt7b.h
-| | | | | |-FreeSansOblique12pt7b.h
-| | | | | |-FreeSansOblique18pt7b.h
-| | | | | |-FreeSansOblique24pt7b.h
-| | | | | |-FreeSansOblique9pt7b.h
-| | | | | |-FreeSerif12pt7b.h
-| | | | | |-FreeSerif18pt7b.h
-| | | | | |-FreeSerif24pt7b.h
-| | | | | |-FreeSerif9pt7b.h
-| | | | | |-FreeSerifBold12pt7b.h
-| | | | | |-FreeSerifBold18pt7b.h
-| | | | | |-FreeSerifBold24pt7b.h
-| | | | | |-FreeSerifBold9pt7b.h
-| | | | | |-FreeSerifBoldItalic12pt7b.h
-| | | | | |-FreeSerifBoldItalic18pt7b.h
-| | | | | |-FreeSerifBoldItalic24pt7b.h
-| | | | | |-FreeSerifBoldItalic9pt7b.h
-| | | | | |-FreeSerifItalic12pt7b.h
-| | | | | |-FreeSerifItalic18pt7b.h
-| | | | | |-FreeSerifItalic24pt7b.h
-| | | | | |-FreeSerifItalic9pt7b.h
-| | | | | |-Org_01.h
-| | | | | |-Picopixel.h
-| | | | | |-Tiny3x3a2pt7b
-| | | | | `-TomThumb.h
-*/
 
 #include <avr/wdt.h>
 #include <SPI.h>          // f.k. for Arduino-1.5.2
@@ -126,7 +71,20 @@ byte addresses[][6] = { "1Node"}; // Create address for 1 pipe.
 struct payload_t {
   int channelNumber;
   float tempC;
+  float ambTempTh;
+  float pipeTempTh;
+  bool boilerOn;
 };
+
+struct ElapsedTime
+{
+	int elapsedMinutes;
+	int elapsedSeconds;
+	int elapsedHours;
+};
+
+double startTime;
+struct ElapsedTime et;
 
 //create object
 //EasyTransferI2C ET; 
@@ -233,6 +191,7 @@ int lm35ReadbackValue;
 float minAmbTemperature = 0;
 float maxAmbTemperature = 0;
 double averagedTempC;
+int duration = 0;
 
 void setup()
 {
@@ -240,8 +199,8 @@ void setup()
     uint32_t when = millis();
     Serial.println("Serial took " + String((millis() - when)) + "ms to start");
 
-    myRadio.begin();  // Start up the physical nRF24L01 Radio
-    myRadio.setChannel(108);  // Above most Wifi Channels
+    myRadio.begin();         // Start up the physical nRF24L01 Radio
+    myRadio.setChannel(108); // Above most Wifi Channels
     // Set the PA Level low to prevent power supply related issues since this is a
     myRadio.setPALevel(RF24_PA_MIN);
     //myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
@@ -250,19 +209,19 @@ void setup()
     myRadio.openReadingPipe(1, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
     myRadio.startListening();
 
-	clock.begin();
-    
-	// Restore time on RTC if lost
-	// Set sketch compiling time
-	  //clock.setDateTime(__DATE__, __TIME__);
+    clock.begin();
+
+    // Restore time on RTC if lost
+    // Set sketch compiling time
+    //clock.setDateTime(__DATE__, __TIME__);
     upTime = clock.getDateTime();
-    analogReference(INTERNAL1V1); //For LM35 Temperature Sensor  
+    analogReference(INTERNAL1V1); //For LM35 Temperature Sensor
     randomSeed(analogRead(0));
 
     //Wire.begin(I2C_SLAVE_ADDRESS);
-    //start the i2c library, pass in the data details 
-    //and the name of the serial port. 
-    //Can be Serial, Serial1, Serial2, etc. 
+    //start the i2c library, pass in the data details
+    //and the name of the serial port.
+    //Can be Serial, Serial1, Serial2, etc.
     //ET.begin(details(mydata), &Wire);
     //define handler function on receiving data
     //Wire.onReceive(receive);
@@ -270,27 +229,26 @@ void setup()
     uint16_t ID = tft.readID(); //
     Serial.print("ID = 0x");
     Serial.println(ID, HEX);
-    if (ID == 0xD3D3) ID = 0x9481; // write-only shield
+    if (ID == 0xD3D3)
+        ID = 0x9481; // write-only shield
     tft.begin(ID);
     tft.invertDisplay(true);
     tft.setFont(&FreeSans24pt7b);
 
-
     //Enable watchdog timer
 
-	//disable all interrupts
-	cli();
-	/* Clear MCU Status Register. Not really needed here as we don't need to know why the MCU got reset. page 44 of datasheet */
-	MCUSR = 0;
+    //disable all interrupts
+    cli();
+    /* Clear MCU Status Register. Not really needed here as we don't need to know why the MCU got reset. page 44 of datasheet */
+    MCUSR = 0;
 
+    wdt_reset();
 
-	wdt_reset();
+    WDTCSR |= B00011000;
+    WDTCSR = B01101001;
 
-	WDTCSR |= B00011000;
-	WDTCSR =  B01101001;
-
-	// Enable all interrupts.
-	sei();
+    // Enable all interrupts.
+    sei();
     tft.fillScreen(BLACK);
     minAmbTemperature = 25;
 }
@@ -305,21 +263,23 @@ void printmsg(int row, const char *msg)
     tft.println(msg);
 }
 
-
 void loop()
 {
-    count = count < 25 ? count+=1 : count;
+    count = count < 25 ? count += 1 : count;
     payload_t payload;
 
-    while (myRadio.available())  // While there is data ready
-    if (myRadio.available())  // While there is data ready
+    while (myRadio.available()) // While there is data ready
     {
-      myRadio.read(&payload, sizeof(payload)); // Get the data payload (You must have defined that already!)
-      Serial.println("data captured");
-      //watchdog++;
-      wdt_reset();
+        myRadio.read(&payload, sizeof(payload)); // Get the data payload (You must have defined that already!)
+        Serial.println("data captured");
+        Serial.println("chan Number: " + String(payload.channelNumber));
+        Serial.println("tempC: "+  String(payload.tempC));
+        Serial.println("ambTempTh: "+  String(payload.ambTempTh));
+        Serial.println("pipeTempTh: "+  String(payload.pipeTempTh));
+        Serial.println("boilerOn: "+  String(payload.boilerOn));
+        wdt_reset();
     }
-    Serial.println("Readback Temperature: " + String(payload.tempC));    
+    Serial.println("Readback Temperature: " + String(payload.tempC));
     uint8_t aspect;
     uint16_t pixel;
     uint16_t dx, rgb, n, wid, ht, msglin;
@@ -329,83 +289,124 @@ void loop()
     msglin = (ht > 160) ? 200 : 112;
     dx = wid / 32;
 
-
+    // Set date at top of screen
     dt = clock.getDateTime();
-    
     tft.setFont(&FreeSans12pt7b);
     tft.setTextColor(VGA_SILVER);
-    printmsg(16, clock.dateFormat("d F Y ",dt));
+    printmsg(18, clock.dateFormat("d F Y ", dt));
 
-    //dt = clock.getDateTime();
-    tft.setFont(&FreeSans24pt7b);
     tft.setTextSize(1);
-    tft.setCursor(0, 92);
-    //tft.setTextColor(VGA_SILVER);
-    //tft.println(" COLOR GRADES");
-    tft.drawRect(0, 0, 180, 25,RED);
+    if (dt.hour == 0 && dt.minute == 0 && dt.second < 5)
+        tft.fillRect(0, 0, 180, 25, RED);
 
     // Draw the box that clears the active time
     // and print just the hour and mintue
     tft.setFont(&FreeSans24pt7b);
     tft.setTextSize(2);
     tft.setCursor(200, 70);
-    tft.setTextColor(VGA_YELLOW,VGA_BLACK);
+    tft.setTextColor(VGA_YELLOW, VGA_BLACK);
     dt = clock.getDateTime();
-    tft.println(clock.dateFormat("H:i",dt));
-    if(dt.second < 2)
-      tft.fillRect(200, 0, 240, 80,BLACK);
-
+    tft.println(clock.dateFormat("H:i", dt));
+    if (dt.second < 2)
+        tft.fillRect(200, 0, 240, 80, BLACK);
 
     tft.setTextColor(VGA_RED);
-    tft.setCursor(0, ht-10);
+    tft.setCursor(0, ht - 10);
     tft.setFont(&FreeSans12pt7b);
     tft.setTextSize(1);
     tft.print("System up since: ");
-        tft.println(clock.dateFormat("d F Y H:i",upTime));
+    tft.println(clock.dateFormat("d F Y H:i", upTime));
 
-            tft.drawRect(0, ht-230, 265, 100,VGA_AQUA); //x/y/wid/height/color
+    tft.drawRect(0, ht - 230, 265, 100, VGA_AQUA); //x/y/wid/height/color
 
-            tft.setTextColor(YELLOW);
-            tft.setTextSize(1);
-            tft.setFont(&FreeMono18pt7b);
-            tft.setCursor(5, ht-200);
-            tft.fillRect(105, ht-225, 125, 30,BLACK); //x/y/wid/height/color
-            averagedTempC = approxRollingAverage(averagedTempC,payload.tempC,5);
-            //tft.println("Pipe: " + String(payload.channelNumber) + "'C");
-            tft.println("AVG: " + String(averagedTempC));
-            Serial.println("Pipe Temp: " + String(payload.channelNumber) + " °C");
+    tft.setTextColor(YELLOW);
+    tft.setTextSize(1);
+    tft.setFont(&FreeMono18pt7b);
+    tft.setCursor(5, ht - 200);
+    tft.fillRect(105, ht - 225, 135, 30, BLACK); //x/y/wid/height/color
+    averagedTempC = approxRollingAverage(averagedTempC, payload.tempC, 5);
+    //tft.println("Pipe: " + String(payload.channelNumber) + "'C");
+    tft.println("AVG: " + String(averagedTempC) + "'C");
+    Serial.println("Pipe Temp: " + String(payload.channelNumber) + " °C");
 
-            tft.fillRect(105, ht-175, 125, 30,BLACK); //x/y/wid/height/color
-            tft.setCursor(5, ht-150);
-            tft.println("Amb: " + String(payload.tempC) + "'C");
-            Serial.print("Amb Temp: ");Serial.println(payload.tempC);
+    tft.fillRect(105, ht - 175, 135, 30, BLACK); //x/y/wid/height/color
+    tft.setCursor(5, ht - 150);
+    tft.println("Amb: " + String(payload.tempC) + "'C");
+    Serial.print("Amb Temp: ");
+    Serial.println(payload.tempC);
 
-            //Min/Max values
-            
-            if(count > 20 && averagedTempC < minAmbTemperature)
-               minAmbTemperature = averagedTempC;
-            if(averagedTempC > maxAmbTemperature)
-               maxAmbTemperature = averagedTempC;
+    //Min/Max values
 
-            tft.setFont(&FreeMono12pt7b);
-            tft.fillRect(270, ht-120, 195, 40,BLACK); //x/y/wid/height/color
-            tft.setTextColor(GREEN);
-            tft.setCursor(270, ht-90);
-            tft.println("Max Temp " + String(maxAmbTemperature));
-            Serial.print("Max Temp ");Serial.println(maxAmbTemperature);
+    if (count > 20 && averagedTempC < minAmbTemperature)
+        minAmbTemperature = averagedTempC;
+    if (averagedTempC > maxAmbTemperature)
+        maxAmbTemperature = averagedTempC;
 
-            tft.fillRect(270, ht-75, 195, 40,BLACK); //x/y/wid/height/color
-            tft.setTextColor(BLUE);
-            tft.setCursor(270, ht-45);
-            tft.println("Min Temp " + String(minAmbTemperature));
-            Serial.print("Min Temp");Serial.println(minAmbTemperature);
-            delay(200);
-            //Serial.println("Serial took " + String((millis() - when)) + "ms to start");
-        //}
-        delay(10);
-        wdt_reset();
-    //}
-    //delay(1000);
+    int row1 = 120;
+    int row2 = 160;
+    int col = 300;
+    int margin = 5;
+
+    //Draw a rectangle around the min/max boxes
+    tft.drawRect(col - 2 * margin, 95, 165, 80, VGA_AQUA); //x/y/wid/height/color
+
+    tft.setFont(&FreeMono12pt7b);
+    tft.setTextColor(GREEN);
+    tft.fillRect(col + 50, row1 - 22, 100, 30, BLACK); //x/y/wid/height/color
+    tft.setCursor(col, row1);
+    tft.println("Max " + String(maxAmbTemperature));
+    Serial.print("Max ");
+    Serial.println(maxAmbTemperature);
+
+    tft.setTextColor(BLUE);
+    tft.fillRect(col + 50, row2 - 22, 100, 30, BLACK); //x/y/wid/height/color
+    tft.setCursor(col, row2);
+    tft.println("Min " + String(minAmbTemperature));
+    Serial.print("Min");
+    Serial.println(minAmbTemperature);
+
+    tft.setTextColor(VGA_TRANSPARENT);
+    
+    tft.setCursor(col, row2 + 50);
+    tft.println("PipeTh " + String(payload.pipeTempTh));
+    tft.setCursor(col, row2 + 90);
+    tft.println("AmbTh " + String(payload.ambTempTh));
+
+
+    //Boiler on flag
+    
+    tft.setFont(&FreeMonoBold18pt7b);
+    tft.setTextColor(VGA_AQUA);
+    
+    if(payload.boilerOn) {
+        
+        Serial.println("Boiler On");
+        if(startTime == 0)
+            startTime = millis();
+
+        // if (dt.second == 0 || dt.second == 1) { //print once a minute
+		// 	//myTime = CalculateDuration(numSeconds);
+        //     tft.fillRect(200, 220, 50, 50, GREEN);
+        // }
+        // else
+        //     tft.fillRect(200, 220, 50, 50, VGA_GRAY);
+    }
+    else if(startTime != 0){
+        Serial.println("Boiler OFF");
+        duration += ((millis() - startTime)/1000);
+        startTime = 0;
+        ElapsedTime dur = convertToTimeOn(duration);
+        
+        tft.setCursor(0, 250);
+        tft.println("Boiler on for: ");
+        tft.fillRect(115, 260, 150, 28, BLACK); //x/y/wid/height/color
+        tft.println("H:M:S " + String(dur.elapsedHours) +
+         ":" + String(dur.elapsedMinutes) + ":" +
+               String(dur.elapsedSeconds));
+    }
+
+    delay(100);
+    wdt_reset();
 }
 
 double approxRollingAverage (double avg, double new_sample , int N) {
@@ -413,5 +414,24 @@ double approxRollingAverage (double avg, double new_sample , int N) {
     avg -= avg / N;
     avg += new_sample / N;
     return avg;
+}
+
+ElapsedTime convertToTimeOn(int timeInSeconds) {
+	struct ElapsedTime et;
+    et.elapsedSeconds = timeInSeconds%60;
+    et.elapsedMinutes = timeInSeconds/60;
+    et.elapsedHours = et.elapsedMinutes/60;
+    return et;
+}
+
+
+struct ElapsedTime myTime;
+ElapsedTime CalculateDuration(int numElapsedSeconds) {
+	struct ElapsedTime et;
+
+	et.elapsedSeconds = numElapsedSeconds % 60;
+	et.elapsedMinutes = numElapsedSeconds > 60 ? (numElapsedSeconds / 60 - et.elapsedHours*60) : numElapsedSeconds/60;
+	et.elapsedHours = et.elapsedMinutes / 60;
+	return et;
 }
 
