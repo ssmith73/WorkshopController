@@ -22,12 +22,12 @@
   https://github.com/TMRh20/RF24
    1 - GND
    2 - VCC 3.3V !!! NOT 5V
-   3 - CE to Arduino pin 7
-   4 - CSN to Arduino pin 8
-   5 - SCK to Arduino pin 13
-   6 - MOSI to Arduino pin 11
-   7 - MISO to Arduino pin 12
-   8 - UNUSED
+   3 - CE to Arduino pin 7 (42 on mega - though it doens't matter - any digital pin)
+   4 - CSN to Arduino pin 8 (43 on mega - or any digital pin)
+   5 - SCK to Arduino pin 13 (52 MEGA)
+   6 - MOSI to Arduino pin 11 (51 MEGA)
+   7 - MISO to Arduino pin 12 (50 MEGA)
+   8 - UNUSED (IRQ)
 
    V1.02 02/06/2016
    Questions: terry@yourduino.com */
@@ -70,7 +70,6 @@ RF24 myRadio(42, 53); // "myRadio" is the identifier you will use in following m
 byte addresses[][6] = { "1Node"}; // Create address for 1 pipe.
 
 
-ElapsedTime convertToTimeOn(int timeInSeconds);
 
 struct payload_t {
   int	channelNumber;
@@ -86,6 +85,8 @@ struct ElapsedTime
 	int elapsedSeconds;
 	int elapsedHours;
 };
+
+ElapsedTime convertToTimeOn(int timeInSeconds);
 
 double startTime;
 struct ElapsedTime et;
@@ -403,7 +404,7 @@ void loop()
         
         tft.setCursor(0, 250);
         tft.println("Boiler on for: ");
-        tft.fillRect(115, 260, 150, 28, BLACK); //x/y/wid/height/color
+        tft.fillRect(115, 260, 170, 28, BLACK); //x/y/wid/height/color
         tft.println("H:M:S " + String(dur.elapsedHours) +
          ":" + String(dur.elapsedMinutes) + ":" +
                String(dur.elapsedSeconds));

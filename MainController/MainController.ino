@@ -38,7 +38,7 @@
 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(9, 10); // "myRadio" is the identifier you will use in following methods
 /*-----( Declare Variables )-----*/
-byte addresses[][6] = { "1Node" }; // Create address for 1 pipe.
+byte addresses[][6] = { "1Node","writePipe" }; // Create address for 1 pipe.
 float watchdog;
 
 /*
@@ -82,7 +82,7 @@ struct ElapsedTime
 };
 struct ElapsedTime myTime;
 
-//ElapsedTime CalculateDuration(int numElapsedSeconds);
+ElapsedTime CalculateDuration(int numElapsedSeconds);
 
 float numPipeMeasurements = 0;
 float numAmbMeasurements = 0;
@@ -124,6 +124,7 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 
 	myRadio.openReadingPipe(1, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+	myRadio.openWritingPipe(addresses[1]); // Use the first entry in array 'addresses' (Only 1 right now)
 	myRadio.startListening();
 	watchdog = 0;
 	numSeconds = 0;
