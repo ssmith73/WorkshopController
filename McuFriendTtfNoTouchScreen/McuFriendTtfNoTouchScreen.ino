@@ -64,12 +64,16 @@
 #include <Wire.h>
 //#include <EasyTransferI2C.h>
 
+
 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(42, 53); // "myRadio" is the identifier you will use in following methods
 byte addresses[][6] = { "1Node"}; // Create address for 1 pipe.
 
+
+ElapsedTime convertToTimeOn(int timeInSeconds);
+
 struct payload_t {
-  int channelNumber;
+  int	channelNumber;
   float tempC;
   float ambTempTh;
   float pipeTempTh;
@@ -416,6 +420,7 @@ double approxRollingAverage (double avg, double new_sample , int N) {
     return avg;
 }
 
+
 ElapsedTime convertToTimeOn(int timeInSeconds) {
 	struct ElapsedTime et;
     et.elapsedSeconds = timeInSeconds%60;
@@ -423,7 +428,6 @@ ElapsedTime convertToTimeOn(int timeInSeconds) {
     et.elapsedHours = et.elapsedMinutes/60;
     return et;
 }
-
 
 struct ElapsedTime myTime;
 ElapsedTime CalculateDuration(int numElapsedSeconds) {

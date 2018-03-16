@@ -26,11 +26,11 @@
 #define AMB_RELAY_EN 2
 #define PUMP_RELAY_EN 3
 #define FAN_RELAY_EN 4
-#define TEMPERATURE_MAX 13
+#define TEMPERATURE_MAX 7 
 #define PIPE_TEMP_MIN 21
 #define PIPE_ANALOG_PIN 0
 
-//RGB LED - 5V module
+   //RGB LED - 5V module
 #define RED 5
 #define GREEN 6
 #define BLUE 9
@@ -38,7 +38,7 @@
 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(9, 10); // "myRadio" is the identifier you will use in following methods
 /*-----( Declare Variables )-----*/
-byte addresses[][6] = { "1Node"}; // Create address for 1 pipe.
+byte addresses[][6] = { "1Node" }; // Create address for 1 pipe.
 float watchdog;
 
 /*
@@ -60,15 +60,18 @@ RTCDateTime startTime;
 RTCDateTime EndTime;
 float dataReceived;
 int upTime;
-typedef enum 
+typedef enum
 {
 	ReturnPipe,
 	WorkshopAmbient
 } SensorPositions;
 
 struct payload_t {
-	int channelNumber;
+	int	channelNumber;
 	float tempC;
+	float ambTempTh;
+	float pipeTempTh;
+	bool boilerOn;
 };
 
 struct ElapsedTime
@@ -79,13 +82,17 @@ struct ElapsedTime
 };
 struct ElapsedTime myTime;
 
-ElapsedTime CalculateDuration(int numElapsedSeconds);
+//ElapsedTime CalculateDuration(int numElapsedSeconds);
+
 float numPipeMeasurements = 0;
 float numAmbMeasurements = 0;
 float ambientTemperature = 0;
 float pipeTemperature = 0;
 float pipeTempC;
 int   readTempC;
+bool  boilerOn = false;
+
+
 void setup() /****** SETUP: RUNS ONCE ******/
 {
 	pinMode(AMB_RELAY_EN, OUTPUT);
@@ -144,17 +151,16 @@ void setup() /****** SETUP: RUNS ONCE ******/
 
 	upTimeClk = clock.getDateTime();
 
-} //--(end setup )---j
+} //--(end setup )--j
 
 void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 {
 	payload_t payload;
 	SensorPositions sensorPosition = ReturnPipe;
-  
-  readTempC = analogRead(PIPE_ANALOG_PIN);
-  pipeTemperature = readTempC / 9.31;
 
-  Serial.print("System up since: "); Serial.println(clock.dateFormat("d F Y H:i:s", upTimeClk));
+	readTempC = analogRead(PIPE_ANALOG_PIN);
+	pipeTemperature = readTempC / 9.31;
+	Serial.print("System up since: "); Serial.println(clock.dateFormat("d F Y H:i:s", upTimeClk));
 	if (myRadio.available()) // Check for incoming data from transmitters
 	{
 		Serial.println(F("Data is available "));
@@ -182,7 +188,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 
 		switch (payload.channelNumber)
 		{
-		case ReturnPipe: 
+		case ReturnPipe:
 			Serial.println(" PipeSensor data returned");
 			Serial.print("Number of measurements: Pipe:Ambient : ");
 			Serial.print(++numPipeMeasurements);Serial.print(":");Serial.println(numAmbMeasurements);
@@ -204,57 +210,66 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 		Serial.println(pipeTemperature);
 
 		if (ambientTemperature > TEMPERATURE_MAX) {
+
+			boilerOn = false;
 			Serial.print("Ambient temperature > "); Serial.print(TEMPERATURE_MAX); Serial.println(" Turn off Heat");
 			digitalWrite(AMB_RELAY_EN, HIGH);
-			Serial.print("Heater turned off: "); Serial.println(clock.dateFormat("d F Y H:i:s", dt));
+			Serial.print("Boiler turned off: "); Serial.println(clock.dateFormat("d F Y H:i:s", dt));
 			// As heater turns on, the water temperture will heat up, turn fans off 
 			// if temperature of pipe is less than some (empirical) threshold
 			if (pipeTemperature < PIPE_TEMP_MIN) {
 				Serial.print(" Pipe temperature below ");Serial.print(PIPE_TEMP_MIN);
 				Serial.println(" .Turned off Fans and Pump");
-       
-           digitalWrite(PUMP_RELAY_EN, HIGH);
-           delay(100);
-           digitalWrite(FAN_RELAY_EN, HIGH);
-           digitalWrite(RED,LOW);
-           digitalWrite(GREEN,LOW);
-           digitalWrite(BLUE,HIGH);
-       }
-				
+
+				digitalWrite(PUMP_RELAY_EN, HIGH);
+				delay(100);
+				digitalWrite(FAN_RELAY_EN, HIGH);
+				digitalWrite(RED, LOW);
+				digitalWrite(GREEN, LOW);
+				digitalWrite(BLUE, HIGH);
+			}
+
 			else {
-        Serial.print(" Pipe temperature above ");Serial.print(PIPE_TEMP_MIN);
-        Serial.println(" .Turned on Fans and Pump");
-       
-           digitalWrite(PUMP_RELAY_EN, LOW);
-           delay(100);
-           digitalWrite(FAN_RELAY_EN, LOW);
-           digitalWrite(RED,LOW);
-           digitalWrite(GREEN,HIGH);
-           digitalWrite(BLUE,LOW);
-       }
-           
+				boilerOn = true;
+				Serial.print(" Pipe temperature above ");Serial.print(PIPE_TEMP_MIN);
+				Serial.println(" .Turned on Fans and Pump");
+
+				digitalWrite(PUMP_RELAY_EN, LOW);
+				delay(100);
+				digitalWrite(FAN_RELAY_EN, LOW);
+				digitalWrite(RED, LOW);
+				digitalWrite(GREEN, HIGH);
+				digitalWrite(BLUE, LOW);
+			}
+
 		}
-		else if (ambientTemperature != 0 && ambientTemperature < TEMPERATURE_MAX) { 
+		else if (ambientTemperature != 0 && ambientTemperature < TEMPERATURE_MAX) {
 			numSeconds++;
 			Serial.println(clock.dateFormat("d F Y H:i:s", dt));
 			Serial.print("temperature <= "); Serial.print(TEMPERATURE_MAX);
 			Serial.println(" .Turned on Heater and pump");
 			digitalWrite(AMB_RELAY_EN, LOW);
-      delay(100);
-      digitalWrite(PUMP_RELAY_EN,LOW);
-      digitalWrite(RED,LOW);
-      digitalWrite(GREEN,HIGH);
-      digitalWrite(BLUE,LOW);
-      if(pipeTemperature > PIPE_TEMP_MIN)
-			   digitalWrite(FAN_RELAY_EN, LOW);
-      else {
-         digitalWrite(FAN_RELAY_EN, HIGH);
-         digitalWrite(RED,LOW);
-           digitalWrite(GREEN,LOW);
-           digitalWrite(BLUE,HIGH);
-      }
- 		}
+			boilerOn = true;
+			delay(100);
+			digitalWrite(PUMP_RELAY_EN, LOW);
+			digitalWrite(RED, LOW);
+			digitalWrite(GREEN, HIGH);
+			digitalWrite(BLUE, LOW);
+			if (pipeTemperature > PIPE_TEMP_MIN)
+				digitalWrite(FAN_RELAY_EN, LOW);
+			else {
+				digitalWrite(FAN_RELAY_EN, HIGH);
+				digitalWrite(RED, LOW);
+				digitalWrite(GREEN, LOW);
+				digitalWrite(BLUE, HIGH);
+			}
+		}
 	} //END Radio available
+
+	//Send data to the display
+	payload_t payload = {0,PIPE_TEMP_MIN ,TEMPERATURE_MAX,payload.tempC,boilerOn};
+	myRadio.write(&payload, sizeof(payload)); //  Transmit the data
+
 	delay(2000);
 
 }//--(end main loop )---
@@ -263,7 +278,7 @@ ElapsedTime CalculateDuration(int numElapsedSeconds) {
 	struct ElapsedTime et;
 
 	et.elapsedSeconds = numElapsedSeconds % 60;
-	et.elapsedMinutes = numElapsedSeconds > 60 ? (numElapsedSeconds / 60 - et.elapsedHours*60) : numElapsedSeconds/60;
+	et.elapsedMinutes = numElapsedSeconds > 60 ? (numElapsedSeconds / 60 - et.elapsedHours * 60) : numElapsedSeconds / 60;
 	et.elapsedHours = et.elapsedMinutes / 60;
 	return et;
 }
