@@ -26,7 +26,7 @@
 #define AMB_RELAY_EN 2
 #define PUMP_RELAY_EN 3
 #define FAN_RELAY_EN 4
-#define TEMPERATURE_MAX 7 
+#define TEMPERATURE_MAX 7
 #define PIPE_TEMP_MIN 21
 #define PIPE_ANALOG_PIN 0
 
@@ -36,9 +36,10 @@
 #define BLUE 9
 
 // (Create an instance of a radio, specifying the CE and CS pins. )
-RF24 myRadio(9, 10); // "myRadio" is the identifier you will use in following methods
+RF24 myRadio(7,8); // "myRadio" is the identifier you will use in following methods
 /*-----( Declare Variables )-----*/
-byte addresses[][6] = { "1Node","writePipe" }; // Create address for 1 pipe.
+byte addresses[][6] = { "1Node","2Node" }; // Create address for 1 pipe.
+//byte addresses[][6] = { "1Node" }; // Create address for 1 pipe.
 float watchdog;
 
 /*
@@ -69,6 +70,7 @@ typedef enum
 struct payload_t {
 	int	channelNumber;
 	float tempC;
+  float pipeTempC;
 	float ambTempTh;
 	float pipeTempTh;
 	bool boilerOn;
@@ -91,7 +93,7 @@ float pipeTemperature = 0;
 float pipeTempC;
 int   readTempC;
 bool  boilerOn = false;
-
+payload_t payload;
 
 void setup() /****** SETUP: RUNS ONCE ******/
 {
@@ -108,7 +110,7 @@ void setup() /****** SETUP: RUNS ONCE ******/
 
 	//For the LM35 Temperature sensor, (used on the pipe),use more of the ADC range
 	//This sensor is used as it seems simpler to stick it to the water pipe
-	//analogReference(INTERNAL);
+	analogReference(INTERNAL);
 
 	Serial.begin(115200);
 	clock.begin();
@@ -123,7 +125,7 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	//myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
 	myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 
-	myRadio.openReadingPipe(1, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+	myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
 	myRadio.openWritingPipe(addresses[1]); // Use the first entry in array 'addresses' (Only 1 right now)
 	myRadio.startListening();
 	watchdog = 0;
@@ -156,9 +158,9 @@ void setup() /****** SETUP: RUNS ONCE ******/
 
 void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 {
-	payload_t payload;
+	
 	SensorPositions sensorPosition = ReturnPipe;
-
+  
 	readTempC = analogRead(PIPE_ANALOG_PIN);
 	pipeTemperature = readTempC / 9.31;
 	Serial.print("System up since: "); Serial.println(clock.dateFormat("d F Y H:i:s", upTimeClk));
@@ -267,11 +269,20 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 		}
 	} //END Radio available
 
-	//Send data to the display
-	payload_t payload = {0,PIPE_TEMP_MIN ,TEMPERATURE_MAX,payload.tempC,boilerOn};
-	myRadio.write(&payload, sizeof(payload)); //  Transmit the data
+	delay(500);
+  if(myRadio.available()){
+    //Send data to the display
+     Serial.println("*****************Sending Data to display************************");
+     myRadio.stopListening();
+     payload = {0, payload.tempC,pipeTemperature,TEMPERATURE_MAX,PIPE_TEMP_MIN ,boilerOn};
+     myRadio.write(&payload, sizeof(payload)); //  Transmit the data
+     myRadio.startListening();
+     Serial.println("****************************************************************");
+     Serial.println("****************************************************************");
+  }
+ 
 
-	delay(2000);
+	delay(200);
 
 }//--(end main loop )---
 

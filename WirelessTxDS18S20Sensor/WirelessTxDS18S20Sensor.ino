@@ -29,16 +29,26 @@ int DS18S20_Pin = 2; //DS18S20 Signal pin on digital 2
 					 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(7, 8); // "myRadio" is the identifier you will use in following methods
 					/*-----( Declare Variables )-----*/
-byte addresses[][6] = { "1Node" }; // Create address for 1 pipe.
+byte addresses[][6] = { "1Node","2Node" }; // Create address for 2 pipes.
 float dataTransmitted = 12;  // Data that will be Transmitted from the transmitter
 							 //Temperature chip i/o
 OneWire ds(DS18S20_Pin);  // on digital pin 2
 
 /* What will actually be transmitted across wireless link */
+//struct payload_t {
+//	int channelNumber;
+//	float tempC;
+//};
+
 struct payload_t {
-	int channelNumber;
-	float tempC;
+  int channelNumber;
+  float tempC;
+  float pipeTempC;
+  float ambTempTh;
+  float pipeTempTh;
+  bool boilerOn;
 };
+
 
 void setup()   /****** SETUP: RUNS ONCE ******/
 {
@@ -67,7 +77,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 {
 
 	//myRadio.write(&dataTransmitted, sizeof(dataTransmitted)); //  Transmit the data
-	payload_t payload = { 1,dataTransmitted };
+	payload_t payload = { 1,dataTransmitted,999, 999,999,false};
 
 	//myRadio.write(&tempC, sizeof(tempC)); //  Transmit the data
 	myRadio.write(&payload, sizeof(payload)); //  Transmit the data

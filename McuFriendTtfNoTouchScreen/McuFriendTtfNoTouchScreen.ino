@@ -50,7 +50,7 @@
 
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeMonoBold18pt7b.h>
-#include <Fonts/PicoPixel.h>
+//#include <Fonts/PicoPixel.h>
 #include <Fonts/FreeSansOblique9pt7b.h>
 #include <Fonts/FreeSerif9pt7b.h>
 #include <Fonts/Org_01.h>
@@ -67,13 +67,14 @@
 
 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(42, 53); // "myRadio" is the identifier you will use in following methods
-byte addresses[][6] = { "1Node"}; // Create address for 1 pipe.
+byte addresses[][6] = { "1Node","2Node"}; // Create address for 1 pipe.
 
 
 
 struct payload_t {
   int	channelNumber;
   float tempC;
+  float pipeTempC;
   float ambTempTh;
   float pipeTempTh;
   bool boilerOn;
@@ -211,7 +212,7 @@ void setup()
     //myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
     myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 
-    myRadio.openReadingPipe(1, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+    myRadio.openReadingPipe(1, addresses[1]); // Use the first entry in array 'addresses' (Only 1 right now)
     myRadio.startListening();
 
     clock.begin();
@@ -328,15 +329,15 @@ void loop()
     tft.setTextSize(1);
     tft.setFont(&FreeMono18pt7b);
     tft.setCursor(5, ht - 200);
-    tft.fillRect(105, ht - 225, 135, 30, BLACK); //x/y/wid/height/color
+    tft.fillRect(105, ht - 225, 145, 30, BLACK); //x/y/wid/height/color
     averagedTempC = approxRollingAverage(averagedTempC, payload.tempC, 5);
     //tft.println("Pipe: " + String(payload.channelNumber) + "'C");
-    tft.println("AVG: " + String(averagedTempC) + "'C");
+    tft.println("AMB: " + String(averagedTempC) + "'C");
     Serial.println("Pipe Temp: " + String(payload.channelNumber) + " °C");
 
-    tft.fillRect(105, ht - 175, 135, 30, BLACK); //x/y/wid/height/color
+    tft.fillRect(105, ht - 175, 145, 30, BLACK); //x/y/wid/height/color
     tft.setCursor(5, ht - 150);
-    tft.println("Amb: " + String(payload.tempC) + "'C");
+    tft.println("Pipe:" + String(payload.pipeTempC) + "'C");
     Serial.print("Amb Temp: ");
     Serial.println(payload.tempC);
 
