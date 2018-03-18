@@ -60,6 +60,7 @@ int numSeconds;
 RTCDateTime startTime;
 RTCDateTime EndTime;
 float dataReceived;
+float averagedAmbTemp = 0;
 int upTime;
 typedef enum
 {
@@ -202,6 +203,8 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 			Serial.print("Number of measurements: Pipe:Ambient : ");
 			Serial.print(numPipeMeasurements);Serial.print(":");Serial.println(++numAmbMeasurements);
 			ambientTemperature = payload.tempC;
+      averagedAmbTemp = approxRollingAverage(averagedAmbTemp,payload.tempC,10);
+      Serial.println("Averaged ambient temperature is: "+ String(averagedAmbTemp));
 			break;
 		default:
 			break;
@@ -212,7 +215,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 		Serial.print(ambientTemperature);Serial.print(":");
 		Serial.println(pipeTemperature);
 
-		if (ambientTemperature > TEMPERATURE_MAX) {
+		if (averagedAmbTemp > TEMPERATURE_MAX) {
 
 			boilerOn = false;
 			Serial.print("Ambient temperature > "); Serial.print(TEMPERATURE_MAX); Serial.println(" Turn off Heat");
@@ -246,7 +249,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 			}
 
 		}
-		else if (ambientTemperature != 0 && ambientTemperature < TEMPERATURE_MAX) {
+		else if (averagedAmbTemp != 0 && averagedAmbTemp < TEMPERATURE_MAX) {
 			numSeconds++;
 			Serial.println(clock.dateFormat("d F Y H:i:s", dt));
 			Serial.print("temperature <= "); Serial.print(TEMPERATURE_MAX);
@@ -293,6 +296,12 @@ ElapsedTime CalculateDuration(int numElapsedSeconds) {
 	et.elapsedMinutes = numElapsedSeconds > 60 ? (numElapsedSeconds / 60 - et.elapsedHours * 60) : numElapsedSeconds / 60;
 	et.elapsedHours = et.elapsedMinutes / 60;
 	return et;
+}
+double approxRollingAverage (double avg, double new_sample , int N) {
+
+    avg -= avg / N;
+    avg += new_sample / N;
+    return avg;
 }
 
 

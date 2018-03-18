@@ -23,7 +23,7 @@
    1 - GND
    2 - VCC 3.3V !!! NOT 5V
    3 - CE to Arduino pin 7 (42 on mega - though it doens't matter - any digital pin)
-   4 - CSN to Arduino pin 8 (43 on mega - or any digital pin)
+   4 - CSN to Arduino pin 8 (53 on mega - or any digital pin)
    5 - SCK to Arduino pin 13 (52 MEGA)
    6 - MOSI to Arduino pin 11 (51 MEGA)
    7 - MISO to Arduino pin 12 (50 MEGA)
