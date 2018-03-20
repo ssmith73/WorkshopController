@@ -203,8 +203,8 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 			Serial.print("Number of measurements: Pipe:Ambient : ");
 			Serial.print(numPipeMeasurements);Serial.print(":");Serial.println(++numAmbMeasurements);
 			ambientTemperature = payload.tempC;
-      averagedAmbTemp = approxRollingAverage(averagedAmbTemp,payload.tempC,10);
-      Serial.println("Averaged ambient temperature is: "+ String(averagedAmbTemp));
+			averagedAmbTemp = approxRollingAverage(averagedAmbTemp, payload.tempC, 10);
+			Serial.println("Averaged ambient temperature is: " + String(averagedAmbTemp));
 			break;
 		default:
 			break;

@@ -35,7 +35,7 @@ Questions: terry@yourduino.com */
 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(7, 8); // "myRadio" is the identifier you will use in following methods
 					/*-----( Declare Variables )-----*/
-byte addresses[][6] = { "1Node" }; // Create address for 1 pipe.
+byte addresses[][6] = { "1Node" "2Node" }; // Create address for 1 pipe.
 float tempC;
 int reading;
 int tempPin = 0;
@@ -67,7 +67,7 @@ void setup()   /****** SETUP: RUNS ONCE ******/
 							  // getting_started sketch, and the likelihood of close proximity of the devices. RF24_PA_MAX is default.
 	//myRadio.setPALevel(RF24_PA_MIN);
 	myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
-    myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
+  myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 	myRadio.openWritingPipe(addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
 	delay(1000);
 }//--(end setup )---
