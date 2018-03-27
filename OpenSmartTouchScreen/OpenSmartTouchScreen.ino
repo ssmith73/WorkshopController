@@ -7,12 +7,21 @@
    Pass values via i2c interface, direct to controller
    arduino.
    
+   
 */
 
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <MCUFRIEND_kbv.h>
 #include <avr/wdt.h>
+#include <TouchScreen.h>
 MCUFRIEND_kbv tft;
+
+typedef struct TouchRegions {
+  int x1;
+  int x2;
+  int y1;
+  int y2;
+} touchRegion;
 
 //*********************************
 // COLORS
@@ -56,17 +65,102 @@ MCUFRIEND_kbv tft;
 #define MAGENTA 0xF81F
 #define YELLOW  0xFFE0
 #define WHITE   0xFFFF
+//*********************************
+// Touch screen stuff
+
+#define MINPRESSURE 20
+#define MAXPRESSURE 1000
+
+uint8_t YP = A1;  // must be an analog pin, use "An" notation!
+uint8_t XM = A2;  // must be an analog pin, use "An" notation!
+uint8_t YM = 7;   // can be a digital pin
+uint8_t XP = 6;   // can be a digital pin
+uint8_t SwapXY = 0;
+
+uint16_t TS_LEFT = 880;
+uint16_t TS_RT  = 170;
+uint16_t TS_TOP = 950;
+uint16_t TS_BOT = 180;
+int16_t PENRADIUS = 3;
+
+char *name = "Unknown controller";
+uint16_t identifier, oldcolor, currentcolor;
+#define SWAP(a, b) {uint16_t tmp = a; a = b; b = tmp;}
+
+// For better pressure precision, we need to know the resistance
+// between X+ and X- Use any multimeter to read it
+// For the one we're using, its 260 ohms across the X plate
+TouchScreen ts = TouchScreen(XP, YP, XM, YM, 260);
+//TSPoint tp;
+
+
+void show_Serial(void)
+{
+    Serial.print(F("Found "));
+    Serial.print(name);
+    Serial.println(F(" LCD driver"));
+    Serial.print(F("ID=0x"));
+    Serial.println(identifier, HEX);
+    Serial.println("Screen is " + String(tft.width()) + "x" + String(tft.height()));
+    Serial.println("Calibration is: ");
+    Serial.println("LEFT = " + String(TS_LEFT) + " RT  = " + String(TS_RT));
+    Serial.println("TOP  = " + String(TS_TOP)  + " BOT = " + String(TS_BOT));
+    Serial.print("Wiring is: ");
+    Serial.println(SwapXY ? "SWAPXY" : "PORTRAIT");
+    Serial.println("YP=" + String(YP)  + " XM=" + String(XM));
+    Serial.println("YM=" + String(YM)  + " XP=" + String(XP));
+
+    int Orientation=1;
+    int tmp;
+    switch (Orientation) {      // adjust for different aspects
+        case 0:   break;        //no change,  calibrated for PORTRAIT
+        case 1:   tmp = TS_LEFT, TS_LEFT = TS_BOT, TS_BOT = TS_RT, TS_RT = TS_TOP, TS_TOP = tmp;  break;
+        case 2:   SWAP(TS_LEFT, TS_RT);  SWAP(TS_TOP, TS_BOT); break;
+        case 3:   tmp = TS_LEFT, TS_LEFT = TS_TOP, TS_TOP = TS_RT, TS_RT = TS_BOT, TS_BOT = tmp;  break;
+    }
+}
+
 
 int   ambTemp = 0;
+int   ambTempTh = 7;
+int   pipeTempTh = 21;
 int   pipeTemp = 0;
 bool  fanOn = false;
+bool  setPressed = false;
 
+/*
+   Setup touch regions for the 6 elements
+   + Ambient, pipeTemperature
+   - Ambient, pipeTemperature
+   FAN ON, SET buttons
+*/
+  touchRegion plusAmb;
+  touchRegion plusPipe;
+  touchRegion minusAmb;
+  touchRegion minusPipe;
+  touchRegion fanOnButton;
+  touchRegion setButton;
 
 void setup() {
-  // put your setup code here, to run once:
-  // And Yet Another tester for me.
-  Serial.begin(9600);
 
+
+  plusAmb.x1 = 270;   plusAmb.x2 =410; 
+  plusAmb.y1 = 895;   plusAmb.y2 =700; 
+  minusAmb.x1 = 270;  minusAmb.x2 =410; 
+  minusAmb.y1 = 600;  minusAmb.y2 =475; 
+  
+  plusPipe.x1 = 580;  plusPipe.x2 =710; 
+  plusPipe.y1 = 895;  plusPipe.y2 =700; 
+  minusPipe.x1 = 570; minusPipe.x2 =700; 
+  minusPipe.y1 = 600; minusPipe.y2 =475; 
+
+  fanOnButton.x1 =  779;  fanOnButton.x2 = 966;
+  fanOnButton.y1 =  860;  fanOnButton.y2 = 670;
+
+  setButton.x1 =  779;  setButton.x2 = 966;
+  setButton.y1 =  570;  setButton.y2 = 380;
+
+  Serial.begin(9600);
   Serial.print("TFT size is ");
   Serial.print(tft.width());
   Serial.print("x");
@@ -75,82 +169,141 @@ void setup() {
   uint16_t ID = tft.readID(); //
   Serial.print("ID = 0x");
   Serial.println(ID, HEX);
+  ts = TouchScreen(XP, YP, XM, YM, 260);     //call the constructor AGAIN with new values.
   if (ID == 0xD3D3)
       ID = 0x9481; // write-only shield
+  show_Serial();
+
   tft.begin(ID);
   tft.invertDisplay(true);
-  //tft.setFont(&FreeSans24pt7b);
-
-  //Enable watchdog timer
-
-    //disable all interrupts
-  cli();
-  /* Clear MCU Status Register. Not really needed here as we don't need to know why the MCU got reset. page 44 of datasheet */
-  MCUSR = 0;
-
-  wdt_reset();
-
-  WDTCSR |= B00011000;
-  WDTCSR = B01101001;
-
-  // Enable all interrupts.
-  sei();
   tft.fillScreen(BLACK);
   tft.setRotation(1);
 }
 
 void loop() { // put your main code here, to run repeatedly:
 
-  tft.setTextSize(2);
-  tft.setTextColor(VGA_YELLOW, VGA_BLACK);
+// Configure display
+    tft.setTextSize(2);
+    tft.setTextColor(VGA_YELLOW, VGA_BLACK);
 
-// Ambient threshold
-  tft.setCursor(50, 0);
-  tft.setTextSize(12);
-  tft.print("+");
-  tft.setCursor(50, 80);
-  tft.print("-");
+  // Ambient threshold
+    tft.setCursor(50, 0);
+    tft.setTextSize(12);
+    tft.print("+");
+    tft.setCursor(50, 80);
+    tft.print("-");
 
-  tft.setTextSize(2);
-  tft.setCursor(60, 180);
-  tft.setTextColor(WHITE, VGA_BLACK);
-  tft.println("7'C");
-  tft.setCursor(20, 200);
-  tft.setTextColor(GREEN, VGA_BLACK);
-  tft.println(" Set Amb");
-  tft.setCursor(22, 220);
-  tft.println("Threshold");
+    tft.setTextSize(2);
+    tft.setCursor(60, 180);
+    tft.setTextColor(WHITE, VGA_BLACK);
+    tft.println(ambTempTh + String("'C"));
+    tft.setCursor(20, 200);
+    tft.setTextColor(GREEN, VGA_BLACK);
+    tft.println(" Set Amb");
+    tft.setCursor(22, 220);
+    tft.println("Threshold");
 
-// pipe threshold
-  tft.setCursor(200, 0);
-  tft.setTextSize(12);
-  tft.setTextColor(VGA_YELLOW, VGA_BLACK);
-  tft.print("+");
-  tft.setCursor(200, 80);
-  tft.print("-");
+  // pipe threshold
+    tft.setCursor(200, 0);
+    tft.setTextSize(12);
+    tft.setTextColor(VGA_YELLOW, VGA_BLACK);
+    tft.print("+");
+    tft.setCursor(200, 80);
+    tft.print("-");
 
-  tft.setTextSize(2);
-  tft.setCursor(210, 180);
-  tft.setTextColor(WHITE, VGA_BLACK);
-  tft.println("21'C");
-  tft.setTextColor(VGA_BLUE, VGA_BLACK);
-  tft.setCursor(180, 200);
-  tft.println(" Set pipe");
-  tft.setCursor(182, 220);
-  tft.println("Threshold");
-  wdt_reset();
+    tft.setTextSize(2);
+    tft.setCursor(210, 180);
+    tft.setTextColor(WHITE, VGA_BLACK);
+    tft.println(pipeTempTh + String("'C"));
+    tft.setTextColor(VGA_BLUE, VGA_BLACK);
+    tft.setCursor(180, 200);
+    tft.println(" Set Pipe");
+    tft.setCursor(182, 220);
+    tft.println("Threshold");
+    wdt_reset();
 
-  tft.fillRoundRect(295,20,100,60,8,VGA_RED);
-  tft.setCursor(305, 32);
-  tft.setTextColor(YELLOW, VGA_RED);
-  tft.println("FAN ON");
+    if(fanOn == true) {
+      tft.fillRoundRect(295,20,100,60,8,GREEN);
+      tft.setTextColor(RED, GREEN);
+      tft.setCursor(325, 32);
+      tft.println("FAN");
+      tft.setCursor(330, 55);
+      tft.println("ON");
+    }
+    else {
+      tft.fillRoundRect(295,20,100,60,8,VGA_AQUA);
+      tft.setTextColor(BLACK, VGA_AQUA);
+      tft.setCursor(325, 32);
+      tft.println("FAN");
+      tft.setCursor(320, 55);
+      tft.println("AUTO");
+    }
 
-  tft.setTextSize(3);
-  tft.fillRoundRect(295,120,100,60,8,VGA_AQUA);
-  tft.setCursor(315, 138);
-  tft.setTextColor(VGA_BLACK, VGA_AQUA);
-  tft.println("SET");
+    tft.setTextSize(3);
+    tft.fillRoundRect(295,120,100,60,8,VGA_AQUA);
+    tft.setCursor(315, 138);
+    tft.setTextColor(VGA_BLACK, VGA_AQUA);
+    tft.println("SET");
 
-  
-  delay(2000);
+// Configure touch-controller
+    TSPoint tp;
+    uint16_t xpos, ypos;  //screen coordinates
+    do {
+      tp = ts.getPoint();
+      Serial.println("Waiting to capture point");
+    }while(tp.z == 0);
+
+    pinMode(XM, OUTPUT);
+    pinMode(YP, OUTPUT);
+    pinMode(XP, OUTPUT);
+    pinMode(YM, OUTPUT);
+
+
+    Serial.println("tp.z = " + String(tp.z));
+
+    if (tp.z > MINPRESSURE && tp.z < MAXPRESSURE) {
+        // is controller wired for Landscape ? or are we oriented in Landscape?
+        //if (SwapXY != (Orientation & 1)) SWAP(tp.x, tp.y);
+        SWAP(tp.x, tp.y);
+        // scale from 0->1023 to tft.width  i.e. left = 0, rt = width
+        // most mcufriend have touch (with icons) that extends below the TFT
+        // screens without icons need to reserve a space for "erase"
+        // scale the ADC values from ts.getPoint() to screen values e.g. 0-239
+        xpos = map(tp.x, TS_LEFT, TS_RT, tft.width(), 0);
+        ypos = map(tp.y, TS_TOP, TS_BOT, tft.height(), 0);
+        tft.setCursor(0,150);
+        tft.setTextSize(1);
+        Serial.print("tp.x=" + String(tp.x) + " tp.y=" + String(tp.y) + "   ");
+        tft.setCursor(320,190);
+        tft.println("tp.x=" + String(tp.x) +  "   ");
+        tft.setCursor(320,200);
+        tft.println("tp.y=" + String(tp.y) + "   ");
+
+
+        if( (tp.x > plusAmb.x1) && tp.x < plusAmb.x2) { //Amb + OR -ve touched
+          if(tp.y <= plusAmb.y1  && tp.y >= plusAmb.y2) //Was it the + ?
+             ambTempTh++;
+          if(tp.y <= minusAmb.y1  && tp.y >= minusAmb.y2) //Was it the - ?
+             ambTempTh--;
+        }
+        if( (tp.x > plusPipe.x1) && tp.x < plusPipe.x2) { //PipeTemp + OR -ve touched
+          if(tp.y <= plusPipe.y1  && tp.y >= plusPipe.y2) //Was it the + ?
+             pipeTempTh++;
+          if(tp.y <= minusPipe.y1  && tp.y >= minusPipe.y2) //Was it the - ?
+             pipeTempTh--;
+        }
+        if( (tp.x > fanOnButton.x1) && tp.x < fanOnButton.x2) { //In the button regions?
+          if(tp.y <= fanOnButton.y1  && tp.y >= fanOnButton.y2) //Was it the FAN ON button  ?
+             fanOn = !fanOn;
+          if(tp.y <= setButton.y1  && tp.y >= setButton.y2) {//Was it the - ?
+             SendPacket();
+          }
+        }
+        delay(100);
+    }
+    void SendPacket() {
+      // Send Fan-control signal
+      // Send ambient and pipe threshold values
+
+    }
 }
