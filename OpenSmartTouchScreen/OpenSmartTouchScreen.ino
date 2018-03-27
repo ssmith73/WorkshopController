@@ -9,19 +9,14 @@
    
    
 */
+//#define DEBUG
 
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <MCUFRIEND_kbv.h>
 #include <avr/wdt.h>
 #include <TouchScreen.h>
-MCUFRIEND_kbv tft;
-
-typedef struct TouchRegions {
-  int x1;
-  int x2;
-  int y1;
-  int y2;
-} touchRegion;
+#include <Wire.h>
+#include <EasyTransferI2C.h>
 
 //*********************************
 // COLORS
@@ -70,6 +65,66 @@ typedef struct TouchRegions {
 
 #define MINPRESSURE 20
 #define MAXPRESSURE 1000
+MCUFRIEND_kbv tft;
+
+//For I2C data packet transfer to 2nd controller
+EasyTransferI2C ET; 
+#define I2C_SLAVE_ADDRESS 9
+
+struct SEND_DATA_STRUCTURE {
+  // put your variable definitions here for the 
+  // data you want to send
+  // Put exact equivilent stuct in Rx
+  int ambTempTh;
+  int pipeTempTh;
+  bool turnOnFan;
+};
+
+SEND_DATA_STRUCTURE i2cData;
+
+void SendPacket(int amb, int pipe, bool fanOn) {
+  // Send Fan-control signal
+  // Send ambient and pipe threshold values
+
+  #ifdef DEBUG
+  Serial.println("Sending I2C data packet" +
+    String(i2cData.ambTempTh) + ":" +
+    String(i2cData.pipeTempTh) + ":" + 
+    String(i2cData.turnOnFan));
+  #endif
+
+    i2cData.ambTempTh = amb;
+    i2cData.pipeTempTh = pipe;
+    i2cData.turnOnFan = fanOn;
+
+    tft.setTextSize(3);
+    tft.fillRoundRect(295,120,100,60,8,GREEN);
+    tft.setCursor(310, 138);
+    tft.setTextColor(VGA_BLACK, GREEN);
+    tft.println("SENT");
+
+    //Just to be sure send the data 5 times
+     for(int i=0;i<5;i++)
+       ET.sendData(I2C_SLAVE_ADDRESS);
+     delay(3000);
+
+    tft.setTextSize(3);
+    tft.fillRoundRect(295,120,100,60,8,VGA_AQUA);
+    tft.setCursor(315, 138);
+    tft.setTextColor(VGA_BLACK, VGA_AQUA);
+    tft.println("SET");
+}
+
+
+
+
+typedef struct TouchRegions {
+  int x1;
+  int x2;
+  int y1;
+  int y2;
+} touchRegion;
+
 
 uint8_t YP = A1;  // must be an analog pin, use "An" notation!
 uint8_t XM = A2;  // must be an analog pin, use "An" notation!
@@ -142,6 +197,9 @@ bool  setPressed = false;
   touchRegion setButton;
 
 void setup() {
+  //i2c transfer setup
+  Wire.begin();
+  ET.begin(details(i2cData),&Wire);
 
 
   plusAmb.x1 = 270;   plusAmb.x2 =410; 
@@ -250,7 +308,9 @@ void loop() { // put your main code here, to run repeatedly:
     uint16_t xpos, ypos;  //screen coordinates
     do {
       tp = ts.getPoint();
+      #ifdef DEBUG
       Serial.println("Waiting to capture point");
+      #endif
     }while(tp.z == 0);
 
     pinMode(XM, OUTPUT);
@@ -259,7 +319,9 @@ void loop() { // put your main code here, to run repeatedly:
     pinMode(YM, OUTPUT);
 
 
+    #ifdef DEBUG
     Serial.println("tp.z = " + String(tp.z));
+    #endif
 
     if (tp.z > MINPRESSURE && tp.z < MAXPRESSURE) {
         // is controller wired for Landscape ? or are we oriented in Landscape?
@@ -269,6 +331,8 @@ void loop() { // put your main code here, to run repeatedly:
         // most mcufriend have touch (with icons) that extends below the TFT
         // screens without icons need to reserve a space for "erase"
         // scale the ADC values from ts.getPoint() to screen values e.g. 0-239
+
+        #ifdef DEBUG
         xpos = map(tp.x, TS_LEFT, TS_RT, tft.width(), 0);
         ypos = map(tp.y, TS_TOP, TS_BOT, tft.height(), 0);
         tft.setCursor(0,150);
@@ -278,6 +342,7 @@ void loop() { // put your main code here, to run repeatedly:
         tft.println("tp.x=" + String(tp.x) +  "   ");
         tft.setCursor(320,200);
         tft.println("tp.y=" + String(tp.y) + "   ");
+        #endif
 
 
         if( (tp.x > plusAmb.x1) && tp.x < plusAmb.x2) { //Amb + OR -ve touched
@@ -293,17 +358,15 @@ void loop() { // put your main code here, to run repeatedly:
              pipeTempTh--;
         }
         if( (tp.x > fanOnButton.x1) && tp.x < fanOnButton.x2) { //In the button regions?
-          if(tp.y <= fanOnButton.y1  && tp.y >= fanOnButton.y2) //Was it the FAN ON button  ?
+          if(tp.y <= fanOnButton.y1  && tp.y >= fanOnButton.y2) { //Was it the FAN ON button  ?
              fanOn = !fanOn;
+             SendPacket(ambTempTh,pipeTempTh,fanOn);
+             
+           }
           if(tp.y <= setButton.y1  && tp.y >= setButton.y2) {//Was it the - ?
-             SendPacket();
+             SendPacket(ambTempTh,pipeTempTh,fanOn);
           }
         }
         delay(100);
-    }
-    void SendPacket() {
-      // Send Fan-control signal
-      // Send ambient and pipe threshold values
-
     }
 }

@@ -54,7 +54,8 @@
                 "C:/Users/ssmith4/Documents/Arduino/Open-Smart/Arduino library/Adafruit_GFX",
                 "C:/Users/ssmith4/Documents/Arduino/Open-Smart/Arduino library/OPENSMART_TFT",
                 "${workspaceRoot}",
-                "C:/Users/ssmith4/Documents/Arduino/Open-Smart/Arduino library/TouchScreen"
+                "C:/Users/ssmith4/Documents/Arduino/Open-Smart/Arduino library/TouchScreen",
+                "C:/Users/ssmith4/Documents/Arduino/Arduino-EasyTransfer/EasyTransferI2C"
             ],
             "defines": [
                 "_DEBUG",
