@@ -19,15 +19,16 @@
    V1.02 02/06/2016
    Questions: terry@yourduino.com */
 
+//#define RTC_CONNECTED
+#define I2C_RX
+#define I2C_RX_DEBUG
+//#define DEBUG
 
-#include <SPI.h>   // Comes with Arduino IDE
-#include "RF24.h"  // Download and Install (See above)
-#include <avr/wdt.h>
 #define AMB_RELAY_EN 2
 #define PUMP_RELAY_EN 3
 #define FAN_RELAY_EN 4
-#define TEMPERATURE_MAX 7
-#define PIPE_TEMP_MIN 21
+//#define TEMPERATURE_MAX 7
+//#define PIPE_TEMP_MIN 21
 #define PIPE_ANALOG_PIN 0
 
    //RGB LED - 5V module
@@ -35,12 +36,51 @@
 #define GREEN 6
 #define BLUE 9
 
+#include <SPI.h>   // Comes with Arduino IDE
+#include "RF24.h"  // Download and Install (See above)
+#include <avr/wdt.h>
+#include <string.h>
+
+
 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(7,8); // "myRadio" is the identifier you will use in following methods
 /*-----( Declare Variables )-----*/
 byte addresses[][6] = { "1Node","2Node" }; // Create address for 1 pipe.
 //byte addresses[][6] = { "1Node" }; // Create address for 1 pipe.
 float watchdog;
+
+#ifdef I2C_RX
+	/*
+	  For the nano, connect
+	  SCL: pin A5, SDA: pin A4
+	  For the mega: SCL 21, SDA 20
+	*/
+
+	#include <Wire.h>
+	#include <EasyTransferI2C.h>
+
+
+
+	//Create object
+	EasyTransferI2C ET;
+	#define I2C_SLAVE_ADDRESS 9
+
+	struct RECEIVE_DATA_STRUCTURE {
+	// put your variable definitions here for the 
+	// data you want to send
+	// Put exact equivilent stuct in Rx
+	int ambTempTh;
+	int pipeTempTh;
+	bool turnOnFan;
+	};
+
+	int i2c_ambTempTh = 7;
+	int i2c_pipeTempTh = 21;
+	bool i2c_turnOnFan = true;
+
+	RECEIVE_DATA_STRUCTURE i2cData;
+
+#endif 
 
 /*
 DS3231: Real-Time Clock. Simple example
@@ -50,7 +90,8 @@ Web: http://www.jarzebski.pl
 (c) 2014 by Korneliusz Jarzebski
 */
 
-#include <Wire.h>
+#ifdef RTC_CONNECTED
+
 #include <DS3231.h>
 
 DS3231 clock;
@@ -59,9 +100,11 @@ RTCDateTime upTimeClk;
 int numSeconds;
 RTCDateTime startTime;
 RTCDateTime EndTime;
-float dataReceived;
-float averagedAmbTemp = 0;
 int upTime;
+#endif
+float averagedAmbTemp = 0;
+float dataReceived;
+
 typedef enum
 {
 	ReturnPipe,
@@ -71,12 +114,13 @@ typedef enum
 struct payload_t {
 	int	channelNumber;
 	float tempC;
-  float pipeTempC;
+    float pipeTempC;
 	float ambTempTh;
 	float pipeTempTh;
 	bool boilerOn;
 };
 
+#ifdef RTC_CONNECTED
 struct ElapsedTime
 {
 	int elapsedMinutes;
@@ -84,8 +128,9 @@ struct ElapsedTime
 	int elapsedHours;
 };
 struct ElapsedTime myTime;
-
 ElapsedTime CalculateDuration(int numElapsedSeconds);
+#endif
+
 
 float numPipeMeasurements = 0;
 float numAmbMeasurements = 0;
@@ -98,6 +143,13 @@ payload_t payload;
 
 void setup() /****** SETUP: RUNS ONCE ******/
 {
+	#ifdef I2C_RX
+	Wire.begin(I2C_SLAVE_ADDRESS);
+	//Start the i2c library, pass in the data details
+	//and name the serial(1/2/3) port
+	ET.begin(details(i2cData),&Wire);
+	Wire.onReceive(receive);
+	#endif
 	pinMode(AMB_RELAY_EN, OUTPUT);
 	pinMode(PUMP_RELAY_EN, OUTPUT);
 	pinMode(FAN_RELAY_EN, OUTPUT);
@@ -106,15 +158,27 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	pinMode(BLUE, OUTPUT);
 
 	digitalWrite(PUMP_RELAY_EN, HIGH);
-	digitalWrite(FAN_RELAY_EN, HIGH);
+	digitalWrite(FAN_RELAY_EN, HIGH & i2c_turnOnFan);
 	digitalWrite(AMB_RELAY_EN, HIGH);
 
 	//For the LM35 Temperature sensor, (used on the pipe),use more of the ADC range
 	//This sensor is used as it seems simpler to stick it to the water pipe
 	analogReference(INTERNAL);
-
 	Serial.begin(115200);
+
+    #ifdef RTC_CONNECTED
 	clock.begin();
+	numSeconds = 0;
+	upTimeClk = clock.getDateTime();
+
+	// Restore time on RTC if lost
+	// Set sketch compiling time
+	//clock.setDateTime(__DATE__, __TIME__);
+
+	// Set from UNIX timestamp
+	// clock.setDateTime(1397408400);
+	#endif
+
 	delay(1000);
 	Serial.println(F("RF24/Simple Receive data Test"));
 	Serial.println(F("Questions: terry@yourduino.com"));
@@ -125,19 +189,10 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	myRadio.setPALevel(RF24_PA_MIN);
 	//myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
 	myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
-
 	myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
 	myRadio.openWritingPipe(addresses[1]); // Use the first entry in array 'addresses' (Only 1 right now)
 	myRadio.startListening();
 	watchdog = 0;
-	numSeconds = 0;
-
-	// Restore time on RTC if lost
-	// Set sketch compiling time
-	//clock.setDateTime(__DATE__, __TIME__);
-
-	// Set from UNIX timestamp
-	// clock.setDateTime(1397408400);
 
 	//disable all interrupts
 	cli();
@@ -153,8 +208,6 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	sei();
 	Serial.println(F("Setup Complete: "));
 
-	upTimeClk = clock.getDateTime();
-
 } //--(end setup )--j
 
 void loop()   /****** LOOP: RUNS CONSTANTLY ******/
@@ -164,10 +217,42 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
   
 	readTempC = analogRead(PIPE_ANALOG_PIN);
 	pipeTemperature = readTempC / 9.31;
+	#ifdef RTC_CONNECTED
 	Serial.print("System up since: "); Serial.println(clock.dateFormat("d F Y H:i:s", upTimeClk));
+	#endif
+
+    #ifdef I2C_RX
+	if(ET.receiveData()) {
+
+     #ifdef I2C_RX_DEBUG
+     Serial.println("****************************************************************");
+     Serial.println("****************************************************************");
+     Serial.println("****************************************************************");
+		Serial.println("I2C data received:" +
+		  String("\n\tAmb Temperature: ") + String(i2cData.ambTempTh) + 
+		  String("\n\tPipe Temperature: ") + String(i2cData.pipeTempTh) +
+		  String("\n\tFan: ") + String(i2cData.turnOnFan) );
+     Serial.println("****************************************************************");
+     Serial.println("****************************************************************");
+     Serial.println("****************************************************************");
+	 #endif
+	 i2c_ambTempTh = i2cData.ambTempTh;
+	 i2c_pipeTempTh = i2cData.pipeTempTh;
+	 i2c_turnOnFan = !i2cData.turnOnFan; //relays are active low, so invert here.
+	}
+	#endif
+
+
+	#ifdef DEBUG 
+	Serial.println(F("Data is not available ")); 
+	#endif
 	if (myRadio.available()) // Check for incoming data from transmitters
 	{
+		#ifdef DEBUG
 		Serial.println(F("Data is available "));
+		#endif
+
+	    #ifdef RTC_CONNECTED
 		dt = clock.getDateTime();
 
 		if (dt.second == 0 || dt.second == 1) { //print once a minute
@@ -179,8 +264,11 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 			Serial.print(myTime.elapsedSeconds);
 			Serial.println("\n");
 		}
+		#endif
 
+        #ifdef DEBUG
 		Serial.println(F("\nRadio is available: "));
+		#endif
 		//Serial.println(clock.dateFormat("d F Y H:i:s", dt));
 		while (myRadio.available())  // While there is data ready
 		{
@@ -188,48 +276,64 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 			watchdog++;
 			wdt_reset();
 		}
-		Serial.print(watchdog);
+		#ifdef DEBUG 
+		Serial.print(watchdog); 
+		#endif
 
 		switch (payload.channelNumber)
 		{
 		case ReturnPipe:
+			#ifdef DEBUG
 			Serial.println(" PipeSensor data returned");
 			Serial.print("Number of measurements: Pipe:Ambient : ");
 			Serial.print(++numPipeMeasurements);Serial.print(":");Serial.println(numAmbMeasurements);
+			#endif
 			pipeTemperature = payload.tempC;
 			break;
 		case WorkshopAmbient:
+			#ifdef DEBUG
 			Serial.println(" Workshop ambient data returned");
 			Serial.print("Number of measurements: Pipe:Ambient : ");
 			Serial.print(numPipeMeasurements);Serial.print(":");Serial.println(++numAmbMeasurements);
+			#endif
 			ambientTemperature = payload.tempC;
 			averagedAmbTemp = approxRollingAverage(averagedAmbTemp, payload.tempC, 10);
+			#ifdef DEBUG
 			Serial.println("Averaged ambient temperature is: " + String(averagedAmbTemp));
+			#endif
 			break;
 		default:
 			break;
 		}
+		#ifdef DEBUG
 		Serial.print(" Data received = channel "); Serial.println(payload.channelNumber);
 		Serial.print(" Data received = Temp:  "); Serial.println(payload.tempC);
 		Serial.print("Last Recorded temperatures Ambient:Pipe ");
 		Serial.print(ambientTemperature);Serial.print(":");
 		Serial.println(pipeTemperature);
+		#endif
 
-		if (averagedAmbTemp > TEMPERATURE_MAX) {
+		if (averagedAmbTemp > i2c_ambTempTh) {
 
 			boilerOn = false;
-			Serial.print("Ambient temperature > "); Serial.print(TEMPERATURE_MAX); Serial.println(" Turn off Heat");
+			#ifdef DEBUG 
+			Serial.print("Ambient temperature > "); Serial.print(i2c_ambTempTh); Serial.println(" Turn off Heat"); 
+			#endif
 			digitalWrite(AMB_RELAY_EN, HIGH);
+			#ifdef RTC_CONNECTED
 			Serial.print("Boiler turned off: "); Serial.println(clock.dateFormat("d F Y H:i:s", dt));
+			#endif
 			// As heater turns on, the water temperture will heat up, turn fans off 
 			// if temperature of pipe is less than some (empirical) threshold
-			if (pipeTemperature < PIPE_TEMP_MIN) {
-				Serial.print(" Pipe temperature below ");Serial.print(PIPE_TEMP_MIN);
+			if (pipeTemperature < i2c_pipeTempTh) {
+				#ifdef DEBUG
+				Serial.print(" Pipe temperature below ");Serial.print(i2c_pipeTempTh);
 				Serial.println(" .Turned off Fans and Pump");
+				#endif
 
 				digitalWrite(PUMP_RELAY_EN, HIGH);
 				delay(100);
-				digitalWrite(FAN_RELAY_EN, HIGH);
+				digitalWrite(FAN_RELAY_EN, HIGH & i2c_turnOnFan);
 				digitalWrite(RED, LOW);
 				digitalWrite(GREEN, LOW);
 				digitalWrite(BLUE, HIGH);
@@ -237,23 +341,30 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 
 			else {
 				boilerOn = true;
-				Serial.print(" Pipe temperature above ");Serial.print(PIPE_TEMP_MIN);
+				#ifdef DEBUG
+				Serial.print(" Pipe temperature above ");Serial.print(i2c_pipeTempTh);
 				Serial.println(" .Turned on Fans and Pump");
+				#endif
 
 				digitalWrite(PUMP_RELAY_EN, LOW);
 				delay(100);
-				digitalWrite(FAN_RELAY_EN, LOW);
+				digitalWrite(FAN_RELAY_EN, LOW & i2c_turnOnFan);
 				digitalWrite(RED, LOW);
 				digitalWrite(GREEN, HIGH);
 				digitalWrite(BLUE, LOW);
 			}
 
 		}
-		else if (averagedAmbTemp != 0 && averagedAmbTemp < TEMPERATURE_MAX) {
+		else if (averagedAmbTemp != 0 && averagedAmbTemp < i2c_ambTempTh) {
+			#ifdef RTC_CONNECTED
 			numSeconds++;
 			Serial.println(clock.dateFormat("d F Y H:i:s", dt));
-			Serial.print("temperature <= "); Serial.print(TEMPERATURE_MAX);
+			#endif
+
+			#ifdef DEBUG
+			Serial.print("temperature <= "); Serial.print(i2c_ambTempTh);
 			Serial.println(" .Turned on Heater and pump");
+			#endif
 			digitalWrite(AMB_RELAY_EN, LOW);
 			boilerOn = true;
 			delay(100);
@@ -261,10 +372,10 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 			digitalWrite(RED, LOW);
 			digitalWrite(GREEN, HIGH);
 			digitalWrite(BLUE, LOW);
-			if (pipeTemperature > PIPE_TEMP_MIN)
-				digitalWrite(FAN_RELAY_EN, LOW);
+			if (pipeTemperature > i2c_pipeTempTh)
+				digitalWrite(FAN_RELAY_EN, LOW & i2c_turnOnFan);
 			else {
-				digitalWrite(FAN_RELAY_EN, HIGH);
+				digitalWrite(FAN_RELAY_EN, HIGH & i2c_turnOnFan);
 				digitalWrite(RED, LOW);
 				digitalWrite(GREEN, LOW);
 				digitalWrite(BLUE, HIGH);
@@ -272,23 +383,43 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 		}
 	} //END Radio available
 
-	delay(500);
+  delay(500);
+
   if(myRadio.available()){
     //Send data to the display
+
+    #ifdef DEBUG
      Serial.println("*****************Sending Data to display************************");
+	 #endif
      myRadio.stopListening();
-     payload = {0, payload.tempC,pipeTemperature,TEMPERATURE_MAX,PIPE_TEMP_MIN ,boilerOn};
+     payload = {0, payload.tempC,pipeTemperature,i2c_ambTempTh,i2c_pipeTempTh,boilerOn};
+	
      myRadio.write(&payload, sizeof(payload)); //  Transmit the data
      myRadio.startListening();
+    #ifdef DEBUG
+	 
+	 char fanOnStr[25] = "Fan On!";
+	 char fanOffStr[25] = "Fan on Auto Control!";
+	 char fanMsg[25];
+	 if(i2c_turnOnFan == false) //remember it's inverted.
+	   strcpy(fanMsg,fanOnStr);
+	 else
+	   strcpy(fanMsg,fanOffStr);
+	   
+
+     Serial.println("****************************************************************");
+     Serial.println("Sent: \n" + String("tempC ") + String(payload.tempC) + String("\nPipe Temp ") + 
+	 				String(pipeTemperature) + String("\nAmbTh ") + String(i2c_ambTempTh) +
+					  String("\nPipeTh ") + String(i2c_pipeTempTh) + String("\nfan status: ") + 
+					  fanMsg );
      Serial.println("****************************************************************");
      Serial.println("****************************************************************");
+	 #endif
   }
- 
-
 	delay(200);
-
 }//--(end main loop )---
 
+#ifdef RTC_CONNECTED
 ElapsedTime CalculateDuration(int numElapsedSeconds) {
 	struct ElapsedTime et;
 
@@ -297,6 +428,8 @@ ElapsedTime CalculateDuration(int numElapsedSeconds) {
 	et.elapsedHours = et.elapsedMinutes / 60;
 	return et;
 }
+#endif
+
 double approxRollingAverage (double avg, double new_sample , int N) {
 
     avg -= avg / N;
@@ -304,7 +437,10 @@ double approxRollingAverage (double avg, double new_sample , int N) {
     return avg;
 }
 
-
 /* Store a running average of the last 5 results for each measurement
 	tbd
 */
+
+#ifdef I2C_RX
+void receive(int numBytes) {}
+#endif

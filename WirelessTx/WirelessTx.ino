@@ -35,19 +35,20 @@ Questions: terry@yourduino.com */
 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(7, 8); // "myRadio" is the identifier you will use in following methods
 					/*-----( Declare Variables )-----*/
-byte addresses[][6] = { "1Node" "2Node" }; // Create address for 1 pipe.
-float tempC;
-int reading;
-int tempPin = 0;
+byte 	addresses[][6] = { "1Node" "2Node" }; // Create address for 1 pipe.
+float 	tempC;
+int 	reading;
+int 	tempPin = 0;
 unsigned long startTime = 0;
-bool boilerOn;
+bool 	boilerOn;
 
 struct payload_t {
-  int channelNumber;
+  int  	channelNumber;
   float tempC;
+  float pipeTempC;
   float ambTempTh;
   float pipeTempTh;
-  bool boilerOn;
+  bool 	boilerOn;
 };
 
 void setup()   /****** SETUP: RUNS ONCE ******/
@@ -55,7 +56,6 @@ void setup()   /****** SETUP: RUNS ONCE ******/
 	//For the LM35 Temperature sensor, use more of the ADC range
 	//This sensor is used as it seems simpler to stick it to the water pipe
 	analogReference(INTERNAL);
-
 	// Use the serial Monitor (Symbol on far right). Set speed to 115200 (Bottom Right)
 	Serial.begin(115200);
 	delay(1000);
@@ -67,7 +67,7 @@ void setup()   /****** SETUP: RUNS ONCE ******/
 							  // getting_started sketch, and the likelihood of close proximity of the devices. RF24_PA_MAX is default.
 	//myRadio.setPALevel(RF24_PA_MIN);
 	myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
-  myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
+    myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 	myRadio.openWritingPipe(addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
 	delay(1000);
 }//--(end setup )---
@@ -101,7 +101,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 	reading = analogRead(tempPin);
 	tempC = reading / 9.31;
 	Serial.println(tempC);
-	payload_t payload = {0, tempC,7,21,boilerOn};
+	payload_t payload = {0,14.4, 23.2,7,21,true};
 	//myRadio.write(&tempC, sizeof(tempC)); //  Transmit the data
 	myRadio.write(&payload, sizeof(payload)); //  Transmit the data
 

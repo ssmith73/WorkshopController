@@ -9,7 +9,7 @@
    
    
 */
-//#define DEBUG
+#define DEBUG
 
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <MCUFRIEND_kbv.h>
@@ -115,9 +115,6 @@ void SendPacket(int amb, int pipe, bool fanOn) {
     tft.println("SET");
 }
 
-
-
-
 typedef struct TouchRegions {
   int x1;
   int x2;
@@ -188,6 +185,8 @@ bool  setPressed = false;
    + Ambient, pipeTemperature
    - Ambient, pipeTemperature
    FAN ON, SET buttons
+   2 hidden areas which allow for hot/cold 
+   immediate change to ambient values
 */
   touchRegion plusAmb;
   touchRegion plusPipe;
@@ -195,6 +194,8 @@ bool  setPressed = false;
   touchRegion minusPipe;
   touchRegion fanOnButton;
   touchRegion setButton;
+  touchRegion setHigh;
+  touchRegion setLow;
 
 void setup() {
   //i2c transfer setup
@@ -218,7 +219,13 @@ void setup() {
   setButton.x1 =  779;  setButton.x2 = 966;
   setButton.y1 =  570;  setButton.y2 = 380;
 
-  Serial.begin(9600);
+  setHigh.x1 =  220;  setHigh.x2 = 450;
+  setHigh.y1 =  350;  setHigh.y2 = 230;
+
+  setLow.x1 =  540;  setLow.x2 = 760;
+  setLow.y1 =  350;  setLow.y2 = 230;
+
+  Serial.begin(115200);
   Serial.print("TFT size is ");
   Serial.print(tft.width());
   Serial.print("x");
@@ -348,14 +355,18 @@ void loop() { // put your main code here, to run repeatedly:
         if( (tp.x > plusAmb.x1) && tp.x < plusAmb.x2) { //Amb + OR -ve touched
           if(tp.y <= plusAmb.y1  && tp.y >= plusAmb.y2) //Was it the + ?
              ambTempTh++;
-          if(tp.y <= minusAmb.y1  && tp.y >= minusAmb.y2) //Was it the - ?
+          if(tp.y <= minusAmb.y1  && tp.y >= minusAmb.y2) {//Was it the - ?
+             if(ambTempTh > 9) //redraw if losing a digit
+                tft.fillRect(30,177,100,20,BLACK);
              ambTempTh--;
+          }
         }
         if( (tp.x > plusPipe.x1) && tp.x < plusPipe.x2) { //PipeTemp + OR -ve touched
           if(tp.y <= plusPipe.y1  && tp.y >= plusPipe.y2) //Was it the + ?
              pipeTempTh++;
-          if(tp.y <= minusPipe.y1  && tp.y >= minusPipe.y2) //Was it the - ?
+          if(tp.y <= minusPipe.y1  && tp.y >= minusPipe.y2) { //Was it the - ?
              pipeTempTh--;
+          }
         }
         if( (tp.x > fanOnButton.x1) && tp.x < fanOnButton.x2) { //In the button regions?
           if(tp.y <= fanOnButton.y1  && tp.y >= fanOnButton.y2) { //Was it the FAN ON button  ?
@@ -367,6 +378,19 @@ void loop() { // put your main code here, to run repeatedly:
              SendPacket(ambTempTh,pipeTempTh,fanOn);
           }
         }
+
+//hidden high/low ambient temperature set buttons
+        if( (tp.x > setHigh.x1) && tp.x < setHigh.x2)   //In the high/low regions?
+          if(tp.y <= setHigh.y1  && tp.y >= setHigh.y2)   //Was it the set high temp button  ?
+             ambTempTh = 15;
+        if( (tp.x > setLow.x1) && tp.x < setLow.x2)   //In the button regions?
+          if(tp.y <= setLow.y1  && tp.y >= setLow.y2) {    //Was it the set low temp button  ?
+             if(ambTempTh > 9)
+                tft.fillRect(30,177,100,20,BLACK);
+             ambTempTh = 7;
+    //tft.fillRoundRect(295,120,100,60,8,VGA_AQUA);
+
+          }
         delay(100);
     }
 }

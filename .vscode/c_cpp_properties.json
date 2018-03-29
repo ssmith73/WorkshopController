@@ -55,7 +55,13 @@
                 "C:/Users/ssmith4/Documents/Arduino/Open-Smart/Arduino library/OPENSMART_TFT",
                 "${workspaceRoot}",
                 "C:/Users/ssmith4/Documents/Arduino/Open-Smart/Arduino library/TouchScreen",
-                "C:/Users/ssmith4/Documents/Arduino/Arduino-EasyTransfer/EasyTransferI2C"
+                "C:/Users/ssmith4/Documents/Arduino/Arduino-EasyTransfer/EasyTransferI2C",
+                "C:/Program Files (x86)/Arduino/hardware/arduino/avr/libraries/SPI/src",
+                "C:/Program Files (x86)/Arduino/hardware/arduino/avr/cores/arduino",
+                "C:/Program Files (x86)/Arduino/libraries/RF24-master",
+                "C:/Program Files (x86)/Arduino/hardware/tools/avr/avr/include",
+                "C:/Program Files (x86)/Arduino/hardware/arduino/avr/variants/mega",
+                "C:/Program Files (x86)/Arduino/hardware/arduino/avr/libraries/Wire/src"
             ],
             "defines": [
                 "_DEBUG",
@@ -73,6 +79,7 @@
                     "C:/Program Files (x86)/Windows Kits/10/Include/10.0.16299.0/winrt",
                     "C:/Users/ssmith4/Documents/Arduino/Open-Smart/Arduino library/Adafruit_GFX",
                     "C:/Users/ssmith4/Documents/Arduino/Open-Smart/Arduino library",
+                    "C:/Program Files (x86)/Arduino",
                     "${workspaceRoot}"
                 ],
                 "limitSymbolsToIncludedHeaders": true,
