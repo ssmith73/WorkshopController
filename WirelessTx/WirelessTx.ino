@@ -29,6 +29,9 @@ Questions: terry@yourduino.com */
 /*-----( Import needed libraries )-----*/
 #include <SPI.h>   // Comes with Arduino IDE
 #include "RF24.h"  // Download and Install (See above)
+#include <TimeLib.h>
+#include <TimeAlarms.h>
+AlarmId id;
 /*-----( Declare Constants and Pin Numbers )-----*/
 //None yet
 /*-----( Declare objects )-----*/
@@ -41,6 +44,7 @@ int 	reading;
 int 	tempPin = 0;
 unsigned long startTime = 0;
 bool 	boilerOn;
+	unsigned long loopTime = 0;
 
 struct payload_t {
   int  	channelNumber;
@@ -53,11 +57,16 @@ struct payload_t {
 
 void setup()   /****** SETUP: RUNS ONCE ******/
 {
+
+	setTime(20,25,0,3,31,2018);
+	Alarm.timerRepeat(20,RepeatEvery20Seconds);
+	Alarm.timerRepeat(60,RepeatEvery60Seconds);
+	Alarm.timerRepeat(30,RepeatEvery30Seconds);
 	//For the LM35 Temperature sensor, use more of the ADC range
 	//This sensor is used as it seems simpler to stick it to the water pipe
 	analogReference(INTERNAL);
 	// Use the serial Monitor (Symbol on far right). Set speed to 115200 (Bottom Right)
-	Serial.begin(115200);
+	Serial.begin(9600);
 	delay(1000);
 	Serial.println(F("RF24/Simple Transmit data Test"));
 	Serial.println(F("Questions: terry@yourduino.com"));
@@ -69,39 +78,52 @@ void setup()   /****** SETUP: RUNS ONCE ******/
 	myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
     myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 	myRadio.openWritingPipe(addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+	startTime = millis();
 	delay(1000);
 }//--(end setup )---
 
+unsigned long prevMilliTime = 0;
+unsigned long milliTime = 0;
+unsigned long diff = 0;
+int interval1Sec = 1000;
+int ilterval5Sec = 5000;
+int ambTempTh, pipeTempTh;
 
+void digitalClockDisplay() {
+	Serial.print(hour());
+	Serial.print(minute());
+	Serial.print(second());
+	Serial.println();
+}
+void RepeatEvery60Seconds() {
+		ambTempTh = 1;
+		pipeTempTh = 5;
+		boilerOn = true;
+		Serial.println("60 Seconds!: "); 
+}
+void RepeatEvery30Seconds() {
+		ambTempTh = -10;
+		pipeTempTh = -15;
+		boilerOn = false;
+		Serial.println("30 Seconds!");
+}
+void RepeatEvery20Seconds() {
+		ambTempTh = 10;
+		pipeTempTh = 15;
+		boilerOn = false;
+		Serial.println("20 Seconds ");
+}
 void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 {
-	unsigned long loopTime = millis() - startTime; //Calculate the time since last time the cycle was completed
-
-	if (loopTime <= 1000) //Check if the time is less than 1000 millis, and if so, run loop 1
-	{
-		boilerOn = true;
-		Serial.println("Loop 1");
-	}
-	else if (loopTime > 1000 && loopTime <= 2000) //If time is over 1000 millis and less than/or 2000 millis, run loop 2
-	{
-		boilerOn = false;
-		Serial.println("Loop 2");
-	}
-	else if (loopTime > 2000) //If time is over 2000 millis, set the startTime to millis so the loop time will be reset to zero
-	{
-		boilerOn = true;
-		startTime = millis();
-	}
-	else if(loopTime > 5000) {
-		startTime = 0;
-		boilerOn = false;
-	}
+	digitalClockDisplay();
+	Alarm.delay(1000); //wait one second b/n display
+	unsigned long progTime = 0;
 
 	//TempSense
 	reading = analogRead(tempPin);
 	tempC = reading / 9.31;
 	Serial.println(tempC);
-	payload_t payload = {0,14.4, 23.2,7,21,true};
+	payload_t payload = {0,tempC, tempC/2,ambTempTh,pipeTempTh,boilerOn};
 	//myRadio.write(&tempC, sizeof(tempC)); //  Transmit the data
 	myRadio.write(&payload, sizeof(payload)); //  Transmit the data
 
@@ -109,8 +131,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 	Serial.print(F("Data Transmitted = pipe: "));
 	Serial.print(payload.channelNumber);
 	Serial.print(F(" Temp: "));
-	Serial.println(payload.tempC);
+	Serial.println(tempC);
 	Serial.println(F(" No Acknowledge expected"));
-	delay(200);
 
 } //--(end main loop )---

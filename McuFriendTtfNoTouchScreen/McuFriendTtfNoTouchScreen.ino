@@ -32,6 +32,7 @@
    V1.02 02/06/2016
    Questions: terry@yourduino.com */
 
+#define DEBUG
 
 #if defined(_GFXFONT_H_)
 #include <Fonts/FreeSans9pt7b.h>
@@ -63,6 +64,7 @@
 
 #include <Wire.h>
 //#include <EasyTransferI2C.h>
+double approxRollingAverage (double avg, double new_sample , int N);
 
 
 // (Create an instance of a radio, specifying the CE and CS pins. )
@@ -186,6 +188,7 @@ Web: http://www.jarzebski.pl
 
 DS3231 clock;
 RTCDateTime dt;
+RTCDateTime dtStored;
 RTCDateTime upTime; 
 
 #ifndef min
@@ -198,6 +201,8 @@ float minAmbTemperature = 0;
 float maxAmbTemperature = 0;
 double averagedTempC;
 int duration = 0;
+float ambThStored;
+float pipeThStored;
 
 void setup()
 {
@@ -212,7 +217,11 @@ void setup()
     //myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
     myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 
+   // This pipe is used by Maincontroller
     myRadio.openReadingPipe(1, addresses[1]); // Use the first entry in array 'addresses' (Only 1 right now)
+
+    //This pipe is used by WirelessTx
+    // for debug myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
     myRadio.startListening();
 
     clock.begin();
@@ -271,6 +280,7 @@ void printmsg(int row, const char *msg)
 
 void loop()
 {
+
     count = count < 25 ? count += 1 : count;
     payload_t payload;
 
@@ -306,15 +316,31 @@ void loop()
         tft.fillRect(0, 0, 180, 25, RED);
 
     // Draw the box that clears the active time
-    // and print just the hour and mintue
+    // and print just the hour and minute
     tft.setFont(&FreeSans24pt7b);
     tft.setTextSize(2);
     tft.setCursor(200, 70);
     tft.setTextColor(VGA_YELLOW, VGA_BLACK);
     dt = clock.getDateTime();
+    tft.fillRect(200, 0, 240, 80, BLACK);
+    tft.println(payload.tempC);
+
+//Display the time
+    tft.setFont(&FreeSans24pt7b);
+    tft.setTextSize(2);
+    tft.setCursor(50, 270);
+    tft.setTextColor(VGA_YELLOW, VGA_BLACK);
+    dt = clock.getDateTime();
+    delay(100);
+    if(dtStored.hour != dt.hour ||
+       dtStored.minute != dt.minute )
+        tft.fillRect(40, 200, 250, 80, BLACK);
     tft.println(clock.dateFormat("H:i", dt));
-    if (dt.second < 2)
-        tft.fillRect(200, 0, 240, 80, BLACK);
+    
+    delay(100);
+    dtStored = clock.getDateTime();
+
+
 
     tft.setTextColor(VGA_RED);
     tft.setCursor(0, ht - 10);
@@ -337,6 +363,7 @@ void loop()
 
     tft.fillRect(105, ht - 175, 145, 30, BLACK); //x/y/wid/height/color
     tft.setCursor(5, ht - 150);
+
     tft.println("Pipe:" + String(payload.pipeTempC) + "'C");
     Serial.print("Amb Temp: ");
     Serial.println(payload.tempC);
@@ -373,10 +400,30 @@ void loop()
 
     tft.setTextColor(VGA_TRANSPARENT);
     
-    tft.setCursor(col, row2 + 50);
+    if(payload.ambTempTh != ambThStored) { //redraw box
+    
+    #ifdef DEBUG
+      Serial.println("ambThStored" + String(ambThStored) +
+      "payload.ambTempTh" + String(payload.ambTempTh));
+      #endif
+       tft.fillRect(col+80, row2+70, 100, 30, BLACK); //x/y/wid/height/color
+    }
+
+    if(payload.pipeTempTh != pipeThStored) { //redraw box
+        #ifdef DEBUG
+        Serial.println("pipeThStored" + String(pipeThStored) +
+        "payload.pipeTempTh" + String(payload.pipeTempTh));
+        #endif
+       tft.fillRect(col+85, row1+70, 100, 30, BLACK); //x/y/wid/height/color
+    }
+       
+
+    tft.setCursor(col-5, row2 + 50);
     tft.println("PipeTh " + String(payload.pipeTempTh));
-    tft.setCursor(col, row2 + 90);
+    tft.setCursor(col + 10, row2 + 90);
     tft.println("AmbTh " + String(payload.ambTempTh));
+    ambThStored = payload.ambTempTh;
+    pipeThStored = payload.pipeTempTh;
 
 
     //Boiler on flag
@@ -384,11 +431,12 @@ void loop()
     tft.setFont(&FreeMonoBold18pt7b);
     tft.setTextColor(VGA_AQUA);
     
-    if(payload.boilerOn) {
+    if(payload.boilerOn == true) {
         
+        tft.fillRect(20, 30, 165, 50, GREEN); //x/y/wid/height/color
         Serial.println("Boiler On");
-        if(startTime == 0)
-            startTime = millis();
+        // if(startTime == 0)
+        //     startTime = millis();
 
         // if (dt.second == 0 || dt.second == 1) { //print once a minute
 		// 	//myTime = CalculateDuration(numSeconds);
@@ -397,18 +445,19 @@ void loop()
         // else
         //     tft.fillRect(200, 220, 50, 50, VGA_GRAY);
     }
-    else if(startTime != 0){
+    else {
         Serial.println("Boiler OFF");
-        duration += ((millis() - startTime)/1000);
-        startTime = 0;
-        ElapsedTime dur = convertToTimeOn(duration);
+        tft.fillRect(20, 30, 165, 50, GREY); //x/y/wid/height/color
+        // duration += ((millis() - startTime)/1000);
+        // startTime = 0;
+        // ElapsedTime dur = convertToTimeOn(duration);
         
-        tft.setCursor(0, 250);
-        tft.println("Boiler on for: ");
-        tft.fillRect(115, 260, 170, 28, BLACK); //x/y/wid/height/color
-        tft.println("H:M:S " + String(dur.elapsedHours) +
-         ":" + String(dur.elapsedMinutes) + ":" +
-               String(dur.elapsedSeconds));
+        // tft.setCursor(0, 250);
+        // tft.println("Boiler on for: ");
+        // tft.fillRect(115, 260, 170, 28, BLACK); //x/y/wid/height/color
+        // tft.println("H:M:S " + String(dur.elapsedHours) +
+        //  ":" + String(dur.elapsedMinutes) + ":" +
+        //        String(dur.elapsedSeconds));
     }
 
     delay(100);
