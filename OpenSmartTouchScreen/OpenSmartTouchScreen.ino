@@ -6,9 +6,9 @@
    Capture touch information for add-subract values.
    Pass values via i2c interface, direct to controller
    arduino.
+   */
    
    
-*/
 #define DEBUG
 
 #include <Adafruit_GFX.h>    // Core graphics library
@@ -78,24 +78,27 @@ struct SEND_DATA_STRUCTURE {
   int ambTempTh;
   int pipeTempTh;
   bool turnOnFan;
+  bool turnOffFan;
 };
 
 SEND_DATA_STRUCTURE i2cData;
 
-void SendPacket(int amb, int pipe, bool fanOn) {
+void SendPacket(int amb, int pipe, bool fanOn, bool fanOff) {
   // Send Fan-control signal
   // Send ambient and pipe threshold values
 
   #ifdef DEBUG
-  Serial.println("Sending I2C data packet" +
+    Serial.println("Sending I2C data packet" +
     String(i2cData.ambTempTh) + ":" +
     String(i2cData.pipeTempTh) + ":" + 
-    String(i2cData.turnOnFan));
+    String(i2cData.turnOnFan) + ":" +
+    String(i2cData.turnOffFan));
   #endif
 
     i2cData.ambTempTh = amb;
     i2cData.pipeTempTh = pipe;
     i2cData.turnOnFan = fanOn;
+    i2cData.turnOffFan = fanOff;
 
     tft.setTextSize(3);
     tft.fillRoundRect(295,120,100,60,8,GREEN);
@@ -162,7 +165,7 @@ void show_Serial(void)
     Serial.println("YP=" + String(YP)  + " XM=" + String(XM));
     Serial.println("YM=" + String(YM)  + " XP=" + String(XP));
 
-    int Orientation=1;
+    int Orientation=2;
     int tmp;
     switch (Orientation) {      // adjust for different aspects
         case 0:   break;        //no change,  calibrated for PORTRAIT
@@ -178,6 +181,7 @@ int   ambTempTh = 7;
 int   pipeTempTh = 21;
 int   pipeTemp = 0;
 bool  fanOn = false;
+bool  fanOff = false;
 bool  setPressed = false;
 
 /*
@@ -242,7 +246,7 @@ void setup() {
   tft.begin(ID);
   tft.invertDisplay(true);
   tft.fillScreen(BLACK);
-  tft.setRotation(1);
+  tft.setRotation(3);
 }
 
 void loop() { // put your main code here, to run repeatedly:
@@ -295,6 +299,14 @@ void loop() { // put your main code here, to run repeatedly:
       tft.setCursor(330, 55);
       tft.println("ON");
     }
+    else if(fanOff == true) {
+      tft.fillRoundRect(295,20,100,60,8,RED);
+      tft.setTextColor(BLACK, RED);
+      tft.setCursor(325, 32);
+      tft.println("FAN");
+      tft.setCursor(330, 55);
+      tft.println("OFF");
+    }
     else {
       tft.fillRoundRect(295,20,100,60,8,VGA_AQUA);
       tft.setTextColor(BLACK, VGA_AQUA);
@@ -310,7 +322,7 @@ void loop() { // put your main code here, to run repeatedly:
     tft.setTextColor(VGA_BLACK, VGA_AQUA);
     tft.println("SET");
 
-// Configure touch-controller
+    // Configure touch-controller
     TSPoint tp;
     uint16_t xpos, ypos;  //screen coordinates
     do {
@@ -368,18 +380,39 @@ void loop() { // put your main code here, to run repeatedly:
              pipeTempTh--;
           }
         }
+
+        /*3 way button
+          Normal operation is fanAuto - 
+          Press button in Auto Mode - Fan turns on
+          Press button in Fan On mode - Fan turns OFF
+          Press buttono in FanOn mode - Fan returns to auto mode
+        */
         if( (tp.x > fanOnButton.x1) && tp.x < fanOnButton.x2) { //In the button regions?
           if(tp.y <= fanOnButton.y1  && tp.y >= fanOnButton.y2) { //Was it the FAN ON button  ?
-             fanOn = !fanOn;
-             SendPacket(ambTempTh,pipeTempTh,fanOn);
-             
+            if(fanOff == false && fanOn == false) {
+               fanOn = true;
+               fanOff = false;
+            }
+            else if(fanOn){
+              fanOn = false;
+              fanOff = true;
+            }
+            else if(fanOff) {
+              fanOn = false;
+              fanOff = false;
+            }
+            else {
+              fanOn = false;
+              fanOff = false;
+            }
+             SendPacket(ambTempTh,pipeTempTh,fanOn, fanOff);
            }
-          if(tp.y <= setButton.y1  && tp.y >= setButton.y2) {//Was it the - ?
-             SendPacket(ambTempTh,pipeTempTh,fanOn);
+          if(tp.y <= setButton.y1  && tp.y >= setButton.y2) {//Was it the set button ?
+             SendPacket(ambTempTh,pipeTempTh,fanOn,fanOff);
           }
         }
 
-//hidden high/low ambient temperature set buttons
+     //hidden high/low ambient temperature set buttons
         if( (tp.x > setHigh.x1) && tp.x < setHigh.x2)   //In the high/low regions?
           if(tp.y <= setHigh.y1  && tp.y >= setHigh.y2)   //Was it the set high temp button  ?
              ambTempTh = 15;

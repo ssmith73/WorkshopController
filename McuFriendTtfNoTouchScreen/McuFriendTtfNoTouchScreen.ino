@@ -247,7 +247,7 @@ void setup()
     if (ID == 0xD3D3)
         ID = 0x9481; // write-only shield
     tft.begin(ID);
-    tft.invertDisplay(true);
+    tft.invertDisplay(false);
     tft.setFont(&FreeSans24pt7b);
 
     //Enable watchdog timer
@@ -331,16 +331,14 @@ void loop()
     tft.setCursor(50, 270);
     tft.setTextColor(VGA_YELLOW, VGA_BLACK);
     dt = clock.getDateTime();
-    delay(100);
+    delay(10);
     if(dtStored.hour != dt.hour ||
        dtStored.minute != dt.minute )
         tft.fillRect(40, 200, 250, 80, BLACK);
     tft.println(clock.dateFormat("H:i", dt));
     
-    delay(100);
+    delay(10);
     dtStored = clock.getDateTime();
-
-
 
     tft.setTextColor(VGA_RED);
     tft.setCursor(0, ht - 10);
