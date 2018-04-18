@@ -27,11 +27,9 @@
 #define AMB_RELAY_EN 2
 #define PUMP_RELAY_EN 3
 #define FAN_RELAY_EN 4
-//#define TEMPERATURE_MAX 7
-//#define PIPE_TEMP_MIN 21
 #define PIPE_ANALOG_PIN 0
 
-   //RGB LED - 5V module
+//RGB LED - 5V module
 #define RED 5
 #define GREEN 6
 #define BLUE 9
@@ -44,9 +42,9 @@
 
 // (Create an instance of a radio, specifying the CE and CS pins. )
 RF24 myRadio(7,8); // "myRadio" is the identifier you will use in following methods
-/*-----( Declare Variables )-----*/
+
 byte addresses[][6] = { "1Node","2Node" }; // Create address for 1 pipe.
-//byte addresses[][6] = { "1Node" }; // Create address for 1 pipe.
+
 float watchdog;
 
 #ifdef I2C_RX
