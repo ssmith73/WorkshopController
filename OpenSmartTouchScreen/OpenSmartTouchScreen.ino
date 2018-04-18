@@ -9,7 +9,12 @@
    */
    
    
+<<<<<<< HEAD
 #define DEBUG
+=======
+*/
+//#define DEBUG
+>>>>>>> Added FanOff option for button fan-control
 
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <MCUFRIEND_kbv.h>
@@ -98,7 +103,11 @@ void SendPacket(int amb, int pipe, bool fanOn, bool fanOff) {
     i2cData.ambTempTh = amb;
     i2cData.pipeTempTh = pipe;
     i2cData.turnOnFan = fanOn;
+<<<<<<< HEAD
     i2cData.turnOffFan = fanOff;
+=======
+    i2cData.turnOnFan = fanOff;
+>>>>>>> Added FanOff option for button fan-control
 
     tft.setTextSize(3);
     tft.fillRoundRect(295,120,100,60,8,GREEN);
