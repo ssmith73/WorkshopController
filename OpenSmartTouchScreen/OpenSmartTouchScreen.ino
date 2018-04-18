@@ -6,10 +6,20 @@
    Capture touch information for add-subract values.
    Pass values via i2c interface, direct to controller
    arduino.
+   */
    
    
-*/
+
+
+
+
+
+#define DEBUG
+
+
 //#define DEBUG
+
+
 
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <MCUFRIEND_kbv.h>
@@ -78,6 +88,7 @@ struct SEND_DATA_STRUCTURE {
   int ambTempTh;
   int pipeTempTh;
   bool turnOnFan;
+  bool turnOffFan;
 };
 
 SEND_DATA_STRUCTURE i2cData;
@@ -87,16 +98,17 @@ void SendPacket(int amb, int pipe, bool fanOn, bool fanOff) {
   // Send ambient and pipe threshold values
 
   #ifdef DEBUG
-  Serial.println("Sending I2C data packet" +
+    Serial.println("Sending I2C data packet" +
     String(i2cData.ambTempTh) + ":" +
     String(i2cData.pipeTempTh) + ":" + 
-    String(i2cData.turnOnFan));
+    String(i2cData.turnOnFan) + ":" +
+    String(i2cData.turnOffFan));
   #endif
 
     i2cData.ambTempTh = amb;
     i2cData.pipeTempTh = pipe;
     i2cData.turnOnFan = fanOn;
-    i2cData.turnOnFan = fanOff;
+    i2cData.turnOffFan = fanOff;
 
     tft.setTextSize(3);
     tft.fillRoundRect(295,120,100,60,8,GREEN);

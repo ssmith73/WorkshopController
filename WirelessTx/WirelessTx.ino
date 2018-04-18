@@ -44,7 +44,7 @@ int 	reading;
 int 	tempPin = 0;
 unsigned long startTime = 0;
 bool 	boilerOn;
-	unsigned long loopTime = 0;
+unsigned long loopTime = 0;
 
 struct payload_t {
   int  	channelNumber;
@@ -124,14 +124,15 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 	tempC = reading / 9.31;
 	Serial.println(tempC);
 	payload_t payload = {0,tempC, tempC/2,ambTempTh,pipeTempTh,boilerOn};
-	//myRadio.write(&tempC, sizeof(tempC)); //  Transmit the data
 	myRadio.write(&payload, sizeof(payload)); //  Transmit the data
 
 	//Wireless Tx
-	Serial.print(F("Data Transmitted = pipe: "));
-	Serial.print(payload.channelNumber);
-	Serial.print(F(" Temp: "));
-	Serial.println(tempC);
-	Serial.println(F(" No Acknowledge expected"));
-
+	Serial.println();
+	Serial.println("Data Transmitted = channelNumber: " + String(payload.channelNumber));
+	Serial.println("Data Transmitted = amb: " + String(payload.tempC));
+	Serial.println("Data Transmitted = amb/2: " + String(payload.tempC/2));
+	Serial.println("Data Transmitted = ambTempTh: " + String(payload.ambTempTh));
+	Serial.println("Data Transmitted = pipeTempTh: " + String(payload.pipeTempTh));
+	Serial.println("Data Transmitted = boilerOn: " + String(payload.boilerOn));
+	Serial.println();
 } //--(end main loop )---

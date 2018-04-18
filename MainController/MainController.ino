@@ -22,7 +22,7 @@
 //#define RTC_CONNECTED
 #define I2C_RX
 #define I2C_RX_DEBUG
-//#define DEBUG
+#define DEBUG
 
 #define AMB_RELAY_EN 2
 #define PUMP_RELAY_EN 3
@@ -69,14 +69,16 @@ float watchdog;
 	// put your variable definitions here for the 
 	// data you want to send
 	// Put exact equivilent stuct in Rx
-	int ambTempTh;
-	int pipeTempTh;
-	bool turnOnFan;
+		int ambTempTh; 
+		int pipeTempTh;
+		bool turnOnFan;
+		bool turnOffFan;
 	};
 
 	int i2c_ambTempTh = 7;
 	int i2c_pipeTempTh = 21;
 	bool i2c_turnOnFan = true;
+	bool i2c_turnOffFan = true;
 
 	RECEIVE_DATA_STRUCTURE i2cData;
 
@@ -158,7 +160,8 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	pinMode(BLUE, OUTPUT);
 
 	digitalWrite(PUMP_RELAY_EN, HIGH);
-	digitalWrite(FAN_RELAY_EN, HIGH & i2c_turnOnFan);
+	digitalWrite(FAN_RELAY_EN, 
+	   HIGH & i2c_turnOnFan | i2c_turnOffFan);
 	digitalWrite(AMB_RELAY_EN, HIGH);
 
 	//For the LM35 Temperature sensor, (used on the pipe),use more of the ADC range
@@ -189,8 +192,13 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	myRadio.setPALevel(RF24_PA_MIN);
 	//myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
 	myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
-	myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
-	myRadio.openWritingPipe(addresses[1]); // Use the first entry in array 'addresses' (Only 1 right now)
+	//Working in the workshiop version
+	//myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+
+    
+	//                     (pipe number (0..5), address)
+	myRadio.openReadingPipe(1, addresses[0]); // Use address 0 for reading, address of write must match
+	myRadio.openWritingPipe(addresses[1]); // use address 1 for writing
 	myRadio.startListening();
 	watchdog = 0;
 
@@ -231,7 +239,8 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 		Serial.println("I2C data received:" +
 		  String("\n\tAmb Temperature: ") + String(i2cData.ambTempTh) + 
 		  String("\n\tPipe Temperature: ") + String(i2cData.pipeTempTh) +
-		  String("\n\tFan: ") + String(i2cData.turnOnFan) );
+		  String("\n\tFanOn: ") + String(i2cData.turnOnFan) +
+		  String("\n\tFanOFF: ") + String(i2cData.turnOffFan));
      Serial.println("****************************************************************");
      Serial.println("****************************************************************");
      Serial.println("****************************************************************");
@@ -239,6 +248,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 	 i2c_ambTempTh = i2cData.ambTempTh;
 	 i2c_pipeTempTh = i2cData.pipeTempTh;
 	 i2c_turnOnFan = !i2cData.turnOnFan; //relays are active low, so invert here.
+	 i2c_turnOffFan = !i2cData.turnOffFan; //relays are active low, so invert here.
 	}
 	#endif
 
@@ -284,9 +294,15 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 		{
 		case ReturnPipe:
 			#ifdef DEBUG
-			Serial.println(" PipeSensor data returned");
-			Serial.print("Number of measurements: Pipe:Ambient : ");
-			Serial.print(++numPipeMeasurements);Serial.print(":");Serial.println(numAmbMeasurements);
+			Serial.println("------------------------------------");
+			Serial.println(">PipeSensor data returned");
+			Serial.println(">Data Received = channelNumber: " + String(payload.channelNumber));
+			Serial.println(">Data Received = amb: " + String(payload.tempC));
+			Serial.println(">Data Received = amb/2: " + String(payload.tempC/2));
+			Serial.println(">Data Received = ambTempTh: " + String(payload.ambTempTh));
+			Serial.println(">Data Received = pipeTempTh: " + String(payload.pipeTempTh));
+			Serial.println(">Data Received = boilerOn: " + String(payload.boilerOn));
+			Serial.println("------------------------------------");
 			#endif
 			pipeTemperature = payload.tempC;
 			break;
@@ -333,7 +349,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 
 				digitalWrite(PUMP_RELAY_EN, HIGH);
 				delay(100);
-				digitalWrite(FAN_RELAY_EN, HIGH & i2c_turnOnFan);
+				digitalWrite(FAN_RELAY_EN, HIGH & i2c_turnOnFan | i2c_turnOffFan);
 				digitalWrite(RED, LOW);
 				digitalWrite(GREEN, LOW);
 				digitalWrite(BLUE, HIGH);
@@ -348,7 +364,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 
 				digitalWrite(PUMP_RELAY_EN, LOW);
 				delay(100);
-				digitalWrite(FAN_RELAY_EN, LOW & i2c_turnOnFan);
+				digitalWrite(FAN_RELAY_EN, LOW & i2c_turnOnFan | i2c_turnOffFan);
 				digitalWrite(RED, LOW);
 				digitalWrite(GREEN, HIGH);
 				digitalWrite(BLUE, LOW);
@@ -373,9 +389,9 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 			digitalWrite(GREEN, HIGH);
 			digitalWrite(BLUE, LOW);
 			if (pipeTemperature > i2c_pipeTempTh)
-				digitalWrite(FAN_RELAY_EN, LOW & i2c_turnOnFan);
+				digitalWrite(FAN_RELAY_EN, LOW & i2c_turnOnFan | i2c_turnOffFan);
 			else {
-				digitalWrite(FAN_RELAY_EN, HIGH & i2c_turnOnFan);
+				digitalWrite(FAN_RELAY_EN, HIGH & i2c_turnOnFan | i2c_turnOffFan);
 				digitalWrite(RED, LOW);
 				digitalWrite(GREEN, LOW);
 				digitalWrite(BLUE, HIGH);
@@ -392,19 +408,23 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
      Serial.println("*****************Sending Data to display************************");
 	 #endif
      myRadio.stopListening();
-     payload = {0, payload.tempC,pipeTemperature,i2c_ambTempTh,i2c_pipeTempTh,boilerOn};
+     //payload = {0, payload.tempC,pipeTemperature,i2c_ambTempTh,i2c_pipeTempTh,boilerOn};
+     payload = {0, payload.tempC,payload.tempC/2,i2c_ambTempTh,i2c_pipeTempTh,boilerOn};
 	
      myRadio.write(&payload, sizeof(payload)); //  Transmit the data
      myRadio.startListening();
     #ifdef DEBUG
 	 
 	 char fanOnStr[25] = "Fan On!";
-	 char fanOffStr[25] = "Fan on Auto Control!";
+	 char fanOffStr[25] = "Fan Off!";
+	 char fanAutoStr[25] = "Fan on Auto Control!";
 	 char fanMsg[25];
 	 if(i2c_turnOnFan == false) //remember it's inverted.
 	   strcpy(fanMsg,fanOnStr);
-	 else
+	 if(i2c_turnOffFan == false) //remember it's inverted.
 	   strcpy(fanMsg,fanOffStr);
+	 else
+	   strcpy(fanMsg,fanAutoStr);
 	   
 
      Serial.println("****************************************************************");
