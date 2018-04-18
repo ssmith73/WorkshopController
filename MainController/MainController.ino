@@ -195,13 +195,10 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	//Working in the workshiop version
 	//myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
 
-	myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
-
-
-//original working version
-	myRadio.openWritingPipe(addresses[1]); // Use the first entry in array 'addresses' (Only 1 right now)
-	//
-	//myRadio.openWritingPipe(addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+    
+	//                     (pipe number (0..5), address)
+	myRadio.openReadingPipe(1, addresses[0]); // Use address 0 for reading, address of write must match
+	myRadio.openWritingPipe(addresses[1]); // use address 1 for writing
 	myRadio.startListening();
 	watchdog = 0;
 

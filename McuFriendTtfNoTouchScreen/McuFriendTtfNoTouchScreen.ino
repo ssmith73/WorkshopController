@@ -49,13 +49,13 @@
 #include <MCUFRIEND_kbv.h>
 #include "RF24.h"  //For wireless
 
-#include <Fonts/FreeSans9pt7b.h>
-#include <Fonts/FreeMonoBold18pt7b.h>
+//#include <Fonts/FreeSans9pt7b.h>
 //#include <Fonts/PicoPixel.h>
-#include <Fonts/FreeSansOblique9pt7b.h>
-#include <Fonts/FreeSerif9pt7b.h>
-#include <Fonts/Org_01.h>
-#include <Fonts/FreeSansBold9pt7b.h>
+//#include <Fonts/FreeSansOblique9pt7b.h>
+//#include <Fonts/FreeSerif9pt7b.h>
+//#include <Fonts/Org_01.h>
+//#include <Fonts/FreeSansBold9pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
 #include <Fonts/FreeSans24pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
 #include <Fonts/FreeMono18pt7b.h>
@@ -82,17 +82,17 @@ struct payload_t {
   bool boilerOn;
 };
 
-struct ElapsedTime
-{
-	int elapsedMinutes;
-	int elapsedSeconds;
-	int elapsedHours;
-};
+// struct ElapsedTime
+// {
+// 	int elapsedMinutes;
+// 	int elapsedSeconds;
+// 	int elapsedHours;
+// };
 
-ElapsedTime convertToTimeOn(int timeInSeconds);
+// ElapsedTime convertToTimeOn(int timeInSeconds);
 
-double startTime;
-struct ElapsedTime et;
+// double startTime;
+// struct ElapsedTime et;
 
 //create object
 //EasyTransferI2C ET; 
@@ -111,6 +111,7 @@ struct ElapsedTime et;
 
 float pipeTemp;
 */
+
 //give a name to the group of data
 //RECEIVE_DATA_STRUCTURE mydata;
 
@@ -218,7 +219,7 @@ void setup()
     myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 
    // This pipe is used by Maincontroller
-    myRadio.openReadingPipe(1, addresses[1]); // Use the first entry in array 'addresses' (Only 1 right now)
+    myRadio.openReadingPipe(1, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
 
     //This pipe is used by WirelessTx
     // for debug myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
@@ -228,10 +229,10 @@ void setup()
 
     // Restore time on RTC if lost
     // Set sketch compiling time
-    //clock.setDateTime(__DATE__, __TIME__);
+    clock.setDateTime(__DATE__, __TIME__);
     upTime = clock.getDateTime();
-    analogReference(INTERNAL1V1); //For LM35 Temperature Sensor
-    randomSeed(analogRead(0));
+    //analogReference(INTERNAL1V1); //For LM35 Temperature Sensor
+    //randomSeed(analogRead(0));
 
     //Wire.begin(I2C_SLAVE_ADDRESS);
     //start the i2c library, pass in the data details
@@ -470,21 +471,21 @@ double approxRollingAverage (double avg, double new_sample , int N) {
 }
 
 
-ElapsedTime convertToTimeOn(int timeInSeconds) {
-	struct ElapsedTime et;
-    et.elapsedSeconds = timeInSeconds%60;
-    et.elapsedMinutes = timeInSeconds/60;
-    et.elapsedHours = et.elapsedMinutes/60;
-    return et;
-}
+// ElapsedTime convertToTimeOn(int timeInSeconds) {
+// 	struct ElapsedTime et;
+//     et.elapsedSeconds = timeInSeconds%60;
+//     et.elapsedMinutes = timeInSeconds/60;
+//     et.elapsedHours = et.elapsedMinutes/60;
+//     return et;
+// }
 
-struct ElapsedTime myTime;
-ElapsedTime CalculateDuration(int numElapsedSeconds) {
-	struct ElapsedTime et;
+// struct ElapsedTime myTime;
+// ElapsedTime CalculateDuration(int numElapsedSeconds) {
+// 	struct ElapsedTime et;
 
-	et.elapsedSeconds = numElapsedSeconds % 60;
-	et.elapsedMinutes = numElapsedSeconds > 60 ? (numElapsedSeconds / 60 - et.elapsedHours*60) : numElapsedSeconds/60;
-	et.elapsedHours = et.elapsedMinutes / 60;
-	return et;
-}
+// 	et.elapsedSeconds = numElapsedSeconds % 60;
+// 	et.elapsedMinutes = numElapsedSeconds > 60 ? (numElapsedSeconds / 60 - et.elapsedHours*60) : numElapsedSeconds/60;
+// 	et.elapsedHours = et.elapsedMinutes / 60;
+// 	return et;
+// }
 
