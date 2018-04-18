@@ -229,7 +229,7 @@ void setup()
 
     // Restore time on RTC if lost
     // Set sketch compiling time
-    clock.setDateTime(__DATE__, __TIME__);
+    //clock.setDateTime(__DATE__, __TIME__);
     upTime = clock.getDateTime();
     //analogReference(INTERNAL1V1); //For LM35 Temperature Sensor
     //randomSeed(analogRead(0));
