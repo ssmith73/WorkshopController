@@ -204,6 +204,7 @@ double averagedTempC;
 int duration = 0;
 float ambThStored;
 float pipeThStored;
+int channelNumber = 108;
 
 void setup()
 {
@@ -212,17 +213,24 @@ void setup()
     Serial.println("Serial took " + String((millis() - when)) + "ms to start");
 
     myRadio.begin();         // Start up the physical nRF24L01 Radio
-    myRadio.setChannel(108); // Above most Wifi Channels
+    myRadio.setChannel(channelNumber); // Above most Wifi Channels
     // Set the PA Level low to prevent power supply related issues since this is a
     myRadio.setPALevel(RF24_PA_MIN);
     //myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
     myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 
-   // This pipe is used by Maincontroller
-    myRadio.openReadingPipe(1, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+    /* 
+       This pipe is used by Maincontroller
+       The main controller only reads the temperature (for the moment)
+       For debug: This reads the data from WirelessTx.ino on address[0]
+       There are 125 channels - separated by 1MHz
+       Each channel can have upto 6 addresses
+       The pipe/address is a 6-letter hex string
 
-    //This pipe is used by WirelessTx
-    // for debug myRadio.openReadingPipe(0, addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
+       myRadio.openReadingPipe(pipe#, address)
+    */
+
+    myRadio.openReadingPipe(1, addresses[1]); // Use pipe 1 & first entry in array 'addresses'
     myRadio.startListening();
 
     clock.begin();
@@ -288,7 +296,7 @@ void loop()
     while (myRadio.available()) // While there is data ready
     {
         myRadio.read(&payload, sizeof(payload)); // Get the data payload (You must have defined that already!)
-        Serial.println("data captured");
+        Serial.println("Radio channel number: " + String(channelNumber) + "data captured");
         Serial.println("chan Number: " + String(payload.channelNumber));
         Serial.println("tempC: "+  String(payload.tempC));
         Serial.println("ambTempTh: "+  String(payload.ambTempTh));

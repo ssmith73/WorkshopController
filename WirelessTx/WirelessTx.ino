@@ -54,6 +54,8 @@ struct payload_t {
   float pipeTempTh;
   bool 	boilerOn;
 };
+#define TX_CHANNEL 109
+
 
 void setup()   /****** SETUP: RUNS ONCE ******/
 {
@@ -71,11 +73,11 @@ void setup()   /****** SETUP: RUNS ONCE ******/
 	Serial.println(F("RF24/Simple Transmit data Test"));
 	Serial.println(F("Questions: terry@yourduino.com"));
 	myRadio.begin();  // Start up the physical nRF24L01 Radio
-	myRadio.setChannel(108);  // Above most Wifi Channels
+	myRadio.setChannel(TX_CHANNEL);  // Above most Wifi Channels
 							  // Set the PA Level low to prevent power supply related issues since this is a
 							  // getting_started sketch, and the likelihood of close proximity of the devices. RF24_PA_MAX is default.
-	//myRadio.setPALevel(RF24_PA_MIN);
-	myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
+	myRadio.setPALevel(RF24_PA_MIN);
+	//myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
     myRadio.setDataRate(RF24_250KBPS); // Fast enough.. Better range
 	myRadio.openWritingPipe(addresses[0]); // Use the first entry in array 'addresses' (Only 1 right now)
 	startTime = millis();
@@ -128,6 +130,7 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 
 	//Wireless Tx
 	Serial.println();
+	Serial.println("WirelessTx\t\tUsing radio channel:  " + String(TX_CHANNEL));
 	Serial.println("Data Transmitted = channelNumber: " + String(payload.channelNumber));
 	Serial.println("Data Transmitted = amb: " + String(payload.tempC));
 	Serial.println("Data Transmitted = amb/2: " + String(payload.tempC/2));

@@ -140,6 +140,8 @@ float pipeTempC;
 int   readTempC;
 bool  boilerOn = false;
 payload_t payload;
+#define RX_CHANNEL 109
+#define DISPLAY_CHANNEL 108
 
 void setup() /****** SETUP: RUNS ONCE ******/
 {
@@ -165,7 +167,7 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	//For the LM35 Temperature sensor, (used on the pipe),use more of the ADC range
 	//This sensor is used as it seems simpler to stick it to the water pipe
 	analogReference(INTERNAL);
-	Serial.begin(115200);
+	Serial.begin(9600);
 
     #ifdef RTC_CONNECTED
 	clock.begin();
@@ -185,7 +187,8 @@ void setup() /****** SETUP: RUNS ONCE ******/
 	Serial.println(F("Questions: terry@yourduino.com"));
 
 	myRadio.begin();		 // Start up the physical nRF24L01 Radio
-	myRadio.setChannel(108); // Above most Wifi Channels
+//    myRadio.setRetries(1,10); //retry 3 times with delay of 500uS between each
+	myRadio.setChannel(RX_CHANNEL); // Above most Wifi Channels
 	// Set the PA Level low to prevent power supply related issues since this is a
 	myRadio.setPALevel(RF24_PA_MIN);
 	//myRadio.setPALevel(RF24_PA_MAX);  // Uncomment for more power
@@ -195,7 +198,9 @@ void setup() /****** SETUP: RUNS ONCE ******/
 
     
 	//                     (pipe number (0..5), address)
-	myRadio.openReadingPipe(1, addresses[0]); // Use address 0 for reading, address of write must match
+    //  Read on pipe 1
+    //  Write on pipe 0
+	myRadio.openReadingPipe(0, addresses[0]); // Use address 0 for reading, address of write must match
 	myRadio.openWritingPipe(addresses[1]); // use address 1 for writing
 	myRadio.startListening();
 	watchdog = 0;
@@ -220,19 +225,19 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 {
 	
 	SensorPositions sensorPosition = ReturnPipe;
-  
 	readTempC = analogRead(PIPE_ANALOG_PIN);
 	pipeTemperature = readTempC / 9.31;
+
 	#ifdef RTC_CONNECTED
 	Serial.print("System up since: "); Serial.println(clock.dateFormat("d F Y H:i:s", upTimeClk));
 	#endif
 
-    #ifdef I2C_RX
+    #ifdef I2C_RX 
 	if(ET.receiveData()) {
 
      #ifdef I2C_RX_DEBUG
      Serial.println("****************************************************************");
-     Serial.println("****************************************************************");
+     Serial.println("******   RECEIVING I2C DATA: FROM TOUCHSCREEN    ***************");
      Serial.println("****************************************************************");
 		Serial.println("I2C data received:" +
 		  String("\n\tAmb Temperature: ") + String(i2cData.ambTempTh) + 
@@ -250,11 +255,24 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 	}
 	#endif
 
-
 	#ifdef DEBUG 
 	Serial.println(F("Data is not available ")); 
 	#endif
-	if (myRadio.available()) // Check for incoming data from transmitters
+    //Lets look for data from the thermometer, coming in on channel 109
+    //Data will be tx on channel 109
+    //Data will be tx from channel 109 - the thermometer
+    // and also from the this controller - so, recieve on 109, tx on 108
+
+	myRadio.setChannel(RX_CHANNEL); // Above most Wifi Channels
+
+//	if (myRadio.available()) // Check for incoming data from transmitters
+    while(!myRadio.available()) {
+	    Serial.println(F("\t\tWaiting for rx-data...")); 
+        delay(50);
+        wdt_reset();
+        
+    }
+
 	{
 		#ifdef DEBUG
 		Serial.println(F("Data is available "));
@@ -278,12 +296,12 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 		Serial.println(F("\nRadio is available: "));
 		#endif
 		//Serial.println(clock.dateFormat("d F Y H:i:s", dt));
-		while (myRadio.available())  // While there is data ready
-		{
+	//	while (myRadio.available())  // While there is data ready
+	//	{
 			myRadio.read(&payload, sizeof(payload)); // Get the data payload (You must have defined that already!)
 			watchdog++;
 			wdt_reset();
-		}
+	//	}
 		#ifdef DEBUG 
 		Serial.print(watchdog); 
 		#endif
@@ -397,17 +415,31 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
 		}
 	} //END Radio available
 
-  delay(500);
+    myRadio.setChannel(DISPLAY_CHANNEL); // Above most Wifi Channels
 
-  if(myRadio.available()){
+    delay(500);
+    /*
+    while(!myRadio.available()) {
+        Serial.println(F("\t\tWaiting for tx-channel...")); 
+        delay(500);
+        wdt_reset();
+        
+    }
+    */
+
+//  if(myRadio.available()){
     //Send data to the display
+    {
 
     #ifdef DEBUG
      Serial.println("*****************Sending Data to display************************");
+     Serial.println("*****************     On channel        ************************");
+     Serial.println("*****************       "+ String(DISPLAY_CHANNEL) + "************************");
 	 #endif
      myRadio.stopListening();
      //payload = {0, payload.tempC,pipeTemperature,i2c_ambTempTh,i2c_pipeTempTh,boilerOn};
      payload = {0, payload.tempC,payload.tempC/2,i2c_ambTempTh,i2c_pipeTempTh,boilerOn};
+     //payload = {0, 1.1,2.2,3.3,4.4,true};
 	
      myRadio.write(&payload, sizeof(payload)); //  Transmit the data
      myRadio.startListening();
@@ -434,7 +466,6 @@ void loop()   /****** LOOP: RUNS CONSTANTLY ******/
      Serial.println("****************************************************************");
 	 #endif
   }
-	delay(200);
 }//--(end main loop )---
 
 #ifdef RTC_CONNECTED
